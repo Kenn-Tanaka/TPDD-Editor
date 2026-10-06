@@ -1,0 +1,52 @@
+# 依存関係
+node_modules/
+
+# ビルド成果物・配布パッケージ
+dist/
+**/dist/
+release/
+deliverables/
+
+# C/C++ ビルド成果物・中間ファイル
+build/
+**/build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.ninja
+.ninja_*
+compile_commands.json
+*.exe
+*.dll
+*.so
+*.dylib
+*.obj
+*.o
+*.pdb
+*.bak
+
+# ローカル設定（個人環境固有の接続先・IPを含む実ファイルを除外）
+gateway.json
+**/gateway.json
+!gateway.example.json
+!**/gateway.example.json
+
+# 開発環境・ログ
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vite/
+.env.local
+.env.*.local
+
+# OS・エディタ固有ファイル
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

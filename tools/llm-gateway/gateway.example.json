@@ -1,0 +1,63 @@
+{
+  "listen": { "address": "127.0.0.1", "port": 8765 },
+  "security": { "client_auth": false, "credential_name": "llm_gateway|default" },
+  "credentials": { "service_name": "CloudLLM", "environment_fallback": false },
+  "proxy": {
+    "max_request_body_mb": 64,
+    "connect_timeout_sec": 10,
+    "read_timeout_sec": 600,
+    "write_timeout_sec": 600
+  },
+  "model_cache": { "enabled": true, "ttl_sec": 60 },
+  "cors": {
+    "enabled": true,
+    "allowed_origins": [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "http://localhost:4173",
+      "http://127.0.0.1:4173",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000"
+    ],
+    "allowed_methods": ["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"],
+    "allowed_headers": ["Authorization", "Content-Type", "Accept"],
+    "max_age_sec": 600
+  },
+  "providers": {
+    "lmstudio": {
+      "base_url": "http://127.0.0.1:1234/v1",
+      "authentication": "none",
+      "model_discovery": true,
+      "allowlist": [
+        { "type": "glob", "pattern": "lmstudio/*" }
+      ]
+    },
+    "lmstudio_remote": {
+      "base_url": "http://100.x.y.z:1234/v1",
+      "authentication": "none",
+      "model_discovery": true,
+      "allowlist": [
+        { "type": "glob", "pattern": "lmstudio_remote/*" }
+      ]
+    },
+    "ollama": {
+      "base_url": "http://127.0.0.1:11434/v1",
+      "authentication": "none",
+      "model_discovery": true,
+      "allowlist": [
+        { "type": "glob", "pattern": "ollama/*" }
+      ]
+    },
+    "openrouter": {
+      "base_url": "https://openrouter.ai/api",
+      "authentication": "bearer",
+      "key_vendor": "openrouter",
+      "key_slot": "default",
+      "model_discovery": true,
+      "allowlist": [
+        { "type": "glob", "pattern": "openrouter/*" }
+      ]
+    }
+  },
+  "logging": { "level": "info", "file": "llm-gateway.log" }
+}

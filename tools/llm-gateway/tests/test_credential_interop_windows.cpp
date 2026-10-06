@@ -1,0 +1,6 @@
+#include "gateway/credential_store.hpp"
+#include <windows.h>
+#include <wincred.h>
+#include <iostream>
+#include <string>
+int main(){const std::wstring service=L"CloudLLM-Codex-Interop-Test",username=L"openrouter|interop_test",secret=L"TEST_SECRET_123";CredDeleteW(service.c_str(),CRED_TYPE_GENERIC,0);CredDeleteW((username+L"@"+service).c_str(),CRED_TYPE_GENERIC,0);CREDENTIALW c{};c.Type=CRED_TYPE_GENERIC;c.TargetName=const_cast<wchar_t*>(service.c_str());c.UserName=const_cast<wchar_t*>(username.c_str());c.CredentialBlobSize=static_cast<DWORD>(secret.size()*sizeof(wchar_t));c.CredentialBlob=reinterpret_cast<LPBYTE>(const_cast<wchar_t*>(secret.data()));c.Persist=CRED_PERSIST_SESSION;if(!CredWriteW(&c,0)){std::cerr<<"CredWriteW failed\n";return 1;}auto cleanup=[&]{CredDeleteW(service.c_str(),CRED_TYPE_GENERIC,0);};try{auto store=gateway::make_platform_credential_store();auto found=store->get("CloudLLM-Codex-Interop-Test","openrouter|interop_test");auto absent=store->get("CloudLLM","openrouter|interop_test");if(!found||found->view()!="TEST_SECRET_123"||absent){cleanup();std::cerr<<"keyring-compatible lookup or namespace isolation failed\n";return 2;}}catch(...){cleanup();throw;}cleanup();std::cout<<"Python-keyring-compatible Windows credential lookup passed\n";return 0;}
