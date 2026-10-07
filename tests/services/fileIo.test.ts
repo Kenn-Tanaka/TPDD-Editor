@@ -2,8 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { addEdgeToDiagram, addNodeToDiagram, createNewProject } from '../../src/domain/commands';
 import { Project } from '../../src/domain/schema';
 import { validateProject } from '../../src/domain/validation';
+import { parseAndValidateProjectJson } from '../../src/services/persistence/fileIo';
 
 describe('Project JSON Roundtrip & Error Resilience (P01, P02)', () => {
+  it.each(['tpdd-project', 'thought-expansion-project'] as const)(
+    'P01: %s 形式のプロジェクトファイルを読み込める',
+    async (format) => {
+      const project = { ...createNewProject('読込検証'), format };
+      const file = new File([JSON.stringify(project)], 'project.tpdd.json', {
+        type: 'application/json',
+      });
+
+      const result = await parseAndValidateProjectJson(file);
+
+      expect(result.success).toBe(true);
+      expect(result.project?.format).toBe(format);
+    }
+  );
+
   it('P01: プロジェクトのJSONシリアライズとデシリアライズで整合性が完全保持される', () => {
     const original = createNewProject('ラウンドトリップ検証');
     const diagId = original.rootDiagramId;

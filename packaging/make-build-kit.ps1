@@ -33,8 +33,10 @@ New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
 try {
     Write-Host "ステージング領域にソースおよびツールをコピー中..." -ForegroundColor Yellow
 
-    # 1. build-kit
-    Copy-Item -Recurse -Force "$projectRoot\build-kit" "$stagingDir\build-kit"
+    # 1. Packaging and launcher sources
+    Copy-Item -Recurse -Force "$projectRoot\packaging" "$stagingDir\packaging"
+    New-Item -ItemType Directory -Path "$stagingDir\tools" -Force | Out-Null
+    Copy-Item -Recurse -Force "$projectRoot\tools\launcher" "$stagingDir\tools\launcher"
 
     # 2. src
     Copy-Item -Recurse -Force "$projectRoot\src" "$stagingDir\src"
@@ -51,14 +53,7 @@ try {
     # 4. docs
     Copy-Item -Recurse -Force "$projectRoot\docs" "$stagingDir\docs"
 
-    # 5. deliverables (templates)
-    Copy-Item -Recurse -Force "$projectRoot\deliverables" "$stagingDir\deliverables"
-    # 不要なビルド済みdistはdeliverablesから除外
-    if (Test-Path "$stagingDir\deliverables\app\dist") {
-        Remove-Item -Recurse -Force "$stagingDir\deliverables\app\dist"
-    }
-
-    # 6. scripts
+    # 5. scripts
     Copy-Item -Recurse -Force "$projectRoot\scripts" "$stagingDir\scripts"
 
     # 7. Root configs
@@ -83,8 +78,8 @@ try {
     # 8. ルートに直感的な build.bat へのショートカット／ラッパーバッチを配置
     $rootBuildBat = @'
 @echo off
-cd /d "%~dp0build-kit"
-call build.bat
+cd /d "%~dp0packaging"
+call build-release.bat
 '@
     [System.IO.File]::WriteAllText("$stagingDir\build.bat", $rootBuildBat, [System.Text.Encoding]::ASCII)
 

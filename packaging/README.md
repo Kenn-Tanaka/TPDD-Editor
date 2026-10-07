@@ -9,7 +9,7 @@
 - **ワンクリック完全自動ビルド**:
   - Webフロントエンド（TypeScript / React / Vite）の型検査と本番バンドル
   - LLM Gateway（C++20 / cpp-httplib / OpenSSL / Zlib）のスタティック最適化コンパイル
-  - 配布用ZIPアーカイブ（`release/TPDD_Release_v1.0.0.zip`）の自動圧縮生成
+  - 展開済み配布物とZIPアーカイブ（`release/TPDD_v1.0.0` / `.zip`）の生成
 - **MinGW環境の自動検出と一時調達**:
   - システム上に MinGW-w64 (`g++` / `c++`) が未導入の環境であっても、ポータブル版ツールチェーンを一時的に自動取得・展開してビルドを実行します。
   - ビルド完了後は一時ディレクトリを自動消去するため、**ホストPCのシステム環境変数やレジストリを一切汚しません**。
@@ -23,13 +23,13 @@
 
 ### PowerShell コマンドラインから
 ```powershell
-cd build-kit
-.\build.ps1
+cd packaging
+.\build-release.ps1
 ```
 
 ※ バージョン番号を指定する場合:
 ```powershell
-.\build.ps1 -Version "1.1.0"
+.\build-release.ps1 -Version "1.1.0"
 ```
 
 ---
@@ -40,7 +40,8 @@ cd build-kit
 
 ```
 release/
-└── TPDD_Release_v1.0.0.zip   ★ エンドユーザー配布用パッケージ
+├── TPDD_v1.0.0/              ★ 展開済み配布用パッケージ
+└── TPDD_v1.0.0.zip           ★ ZIP配布用パッケージ
 ```
 
 このZIPを解凍すると、そのまま動作するスタンドアロンパッケージ（Webサーバー、Gateway、サンプル、マニュアル、起動バッチ、デスクトップショートカットインストーラー）が展開されます。
@@ -51,7 +52,19 @@ release/
 
 他環境にビルド環境ごと配布・移送するための「ビルドキット配布用ZIP」を作成する場合:
 
-- **Windows エクスプローラー**: `build-kit\make-kit.bat` をダブルクリック
+- **Windows エクスプローラー**: `packaging\make-build-kit.bat` をダブルクリック
 - **コマンドライン**: `npm run package:kit`
 - **出力先**: `release/TPDD_BuildKit_v1.0.0.zip` (ソースコード、自給自足deps、ビルドスクリプト一式)
+
+---
+
+## 5. ワンクリック起動EXE
+
+MinGW-w64の`g++`がPATHにある環境で次を実行します。
+
+```powershell
+.\build-launcher.ps1
+```
+
+`npm run build:launcher`では`release\TPDD-Launcher.exe`が生成されます。通常は`npm run build:release`を使用し、ランチャーを`release\TPDD_v<version>`のルートへ配置してください。
 

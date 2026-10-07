@@ -23,6 +23,8 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
 $releaseDir = Join-Path $projectRoot "release"
 $gatewaySrcDir = Join-Path $projectRoot "tools\llm-gateway"
+$launcherSource = Join-Path $projectRoot "tools\launcher\src\main.cpp"
+$launcherExe = Join-Path $env:TEMP ("TPDD-Launcher-" + [System.Guid]::NewGuid().ToString("N") + ".exe")
 $stagingDir = Join-Path $env:TEMP ("tpdd-staging-" + [System.Guid]::NewGuid().ToString().Substring(0, 8))
 $tempMingwDir = Join-Path $env:TEMP "tpdd-mingw-temp"
 $isTempMingw = $false
@@ -99,8 +101,22 @@ $gxxVer = (& $gxxCmd.Source --version | Select-Object -First 1)
 Write-Host "  C++ Compiler: $gxxVer (OK)" -ForegroundColor Green
 
 try {
+    # Compile the one-click launcher with a static MinGW runtime.
+    Write-Host "`n[3/7] Compiling TPDD one-click launcher..." -ForegroundColor Yellow
+    & $gxxCmd.Source `
+        -std=c++20 -O2 -DNDEBUG -Wall -Wextra -municode `
+        -static -static-libgcc -static-libstdc++ `
+        $launcherSource -o $launcherExe `
+        -lws2_32 -lshell32 -luser32
+
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $launcherExe)) {
+        Write-Host "[ERROR] Failed to compile TPDD-Launcher.exe." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "  TPDD-Launcher.exe compiled successfully." -ForegroundColor Green
+
     # 3. Compile LLM Gateway (Self-Contained in tools/llm-gateway/deps)
-    Write-Host "`n[3/6] Compiling LLM Gateway (C++20)..." -ForegroundColor Yellow
+    Write-Host "`n[4/7] Compiling LLM Gateway (C++20)..." -ForegroundColor Yellow
     Push-Location $gatewaySrcDir
     
     $compileSources = @(
@@ -146,7 +162,7 @@ try {
     Pop-Location
 
     # 4. Build Frontend
-    Write-Host "`n[4/6] Building Web Frontend (React/TypeScript/Vite)..." -ForegroundColor Yellow
+    Write-Host "`n[5/7] Building Web Frontend (React/TypeScript/Vite)..." -ForegroundColor Yellow
     Push-Location $projectRoot
     
     Write-Host "  Running 'npm run build'..." -ForegroundColor Cyan
@@ -161,7 +177,7 @@ try {
     Pop-Location
 
     # 5. Assemble Staging Package
-    Write-Host "`n[5/6] Assembling release package..." -ForegroundColor Yellow
+    Write-Host "`n[6/7] Assembling release package..." -ForegroundColor Yellow
     
     if (Test-Path $stagingDir) {
         Remove-Item -Recurse -Force $stagingDir
@@ -173,39 +189,52 @@ try {
     
     # 1. App
     Copy-Item -Recurse -Force "$projectRoot\dist\*" "$stagingDir\app\dist\"
-    Copy-Item -Force "$projectRoot\deliverables\app\serve.mjs" "$stagingDir\app\serve.mjs"
-    Copy-Item -Force "$projectRoot\deliverables\app\start-app.bat" "$stagingDir\app\start-app.bat"
+    Copy-Item -Force "$scriptDir\templates\serve.mjs" "$stagingDir\app\serve.mjs"
+    Copy-Item -Force "$scriptDir\templates\start-app.bat" "$stagingDir\app\start-app.bat"
     
     # 2. Gateway
     Copy-Item -Force "$gatewaySrcDir\llm-gateway.exe" "$stagingDir\gateway\llm-gateway.exe"
-    Copy-Item -Force "$gatewaySrcDir\config\gateway.json" "$stagingDir\gateway\config\gateway.json"
-    Copy-Item -Force "$projectRoot\deliverables\gateway\start-gateway.bat" "$stagingDir\gateway\start-gateway.bat"
+    $gatewayConfig = Join-Path $gatewaySrcDir "config\gateway.json"
+    if (-not (Test-Path $gatewayConfig)) {
+        $gatewayConfig = Join-Path $gatewaySrcDir "config\gateway.example.json"
+    }
+    Copy-Item -Force $gatewayConfig "$stagingDir\gateway\config\gateway.json"
+    Copy-Item -Force "$scriptDir\templates\start-gateway.bat" "$stagingDir\gateway\start-gateway.bat"
     
     # 3. Samples & Docs
-    Get-ChildItem "$projectRoot\deliverables\samples\*" | Copy-Item -Destination "$stagingDir\samples\" -Force
+    Copy-Item -Force "$scriptDir\templates\sample-project.tpdd.json" "$stagingDir\samples\"
+    Copy-Item -Force "$scriptDir\templates\sample-project.thought.json" "$stagingDir\samples\"
     Copy-Item -Force "$projectRoot\docs\QUICKSTART.md" "$stagingDir\docs\"
     Copy-Item -Force "$projectRoot\docs\REFERENCE_MANUAL.md" "$stagingDir\docs\"
-    Copy-Item -Force "$projectRoot\deliverables\docs\SPECIFICATION.md" "$stagingDir\docs\"
+    Copy-Item -Force "$projectRoot\docs\SPECIFICATION.md" "$stagingDir\docs\"
     Copy-Item -Force "$projectRoot\AGENTS.md" "$stagingDir\docs\"
     
-    Copy-Item -Force "$projectRoot\deliverables\start-all.bat" "$stagingDir\"
-    Copy-Item -Force "$projectRoot\deliverables\start-all.ps1" "$stagingDir\"
-    Copy-Item -Force "$projectRoot\deliverables\start-all-cmd.bat" "$stagingDir\"
-    Copy-Item -Force "$projectRoot\deliverables\stop-all.bat" "$stagingDir\"
-    Copy-Item -Force "$projectRoot\deliverables\stop-all.ps1" "$stagingDir\"
+    Copy-Item -Force "$scriptDir\templates\start-all.bat" "$stagingDir\"
+    Copy-Item -Force "$scriptDir\templates\start-all.ps1" "$stagingDir\"
+    Copy-Item -Force "$scriptDir\templates\start-all-cmd.bat" "$stagingDir\"
+    Copy-Item -Force "$scriptDir\templates\stop-all.bat" "$stagingDir\"
+    Copy-Item -Force "$scriptDir\templates\stop-all.ps1" "$stagingDir\"
+    Copy-Item -Force $launcherExe "$stagingDir\TPDD-Launcher.exe"
     Copy-Item -Force "$scriptDir\templates\install-shortcut.bat" "$stagingDir\"
-    Copy-Item -Force "$projectRoot\deliverables\README.md" "$stagingDir\"
+    Copy-Item -Force "$scriptDir\templates\package-README.md" "$stagingDir\README.md"
     
     Write-Host "  Staging directory assembled." -ForegroundColor Green
 
     # 6. Compress into Release Zip
-    Write-Host "`n[6/6] Generating Release ZIP Archive..." -ForegroundColor Yellow
+    Write-Host "`n[7/7] Generating Release ZIP Archive..." -ForegroundColor Yellow
     
     if (-not (Test-Path $releaseDir)) {
         New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
     }
     
-    $zipFileName = "TPDD_Release_v$Version.zip"
+    $expandedDir = Join-Path $releaseDir "TPDD_v$Version"
+    if (Test-Path $expandedDir) {
+        Remove-Item -Recurse -Force $expandedDir
+    }
+    New-Item -ItemType Directory -Path $expandedDir -Force | Out-Null
+    Copy-Item -Recurse -Force "$stagingDir\*" $expandedDir
+
+    $zipFileName = "TPDD_v$Version.zip"
     $targetZipPath = Join-Path $releaseDir $zipFileName
     
     if (Test-Path $targetZipPath) {
@@ -226,6 +255,9 @@ try {
     if ($isTempMingw -and (Test-Path $tempMingwDir)) {
         Write-Host "  Cleaning up temporary MinGW..." -ForegroundColor Gray
         Remove-Item -Recurse -Force $tempMingwDir -ErrorAction SilentlyContinue
+    }
+    if (Test-Path $launcherExe) {
+        Remove-Item -Force $launcherExe -ErrorAction SilentlyContinue
     }
 }
 

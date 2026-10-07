@@ -88,7 +88,9 @@ export async function parseAndValidateProjectJson(file: File): Promise<LoadProje
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const obj = parsed as any;
-    if (obj.format !== 'thought-expansion-project' || obj.schemaVersion !== 1) {
+    const supportedFormat =
+      obj.format === 'tpdd-project' || obj.format === 'thought-expansion-project';
+    if (!supportedFormat || obj.schemaVersion !== 1) {
       return {
         success: false,
         errorMessage: '対応するデータ形式ではありません（formatまたはschemaVersionが一致しません）',

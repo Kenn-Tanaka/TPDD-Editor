@@ -15,7 +15,7 @@ pause
 exit /b 1
 
 :ps_ok
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0build.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0build-release.ps1"
 
 echo.
 pause

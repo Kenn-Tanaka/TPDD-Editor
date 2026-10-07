@@ -47,42 +47,46 @@ export async function saveAutoSaveSnapshot(
   sessionId: string,
   project: Project
 ): Promise<void> {
-  try {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
+  const db = await openDB();
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  const store = tx.objectStore(STORE_NAME);
 
-    const snapshot: AutoSaveSnapshot = {
-      id: sessionId,
-      projectId: project.id,
-      projectTitle: project.title,
-      savedAt: new Date().toISOString(),
-      project,
-    };
+  const snapshot: AutoSaveSnapshot = {
+    id: sessionId,
+    projectId: project.id,
+    projectTitle: project.title,
+    savedAt: new Date().toISOString(),
+    project,
+  };
 
-    await new Promise<void>((resolve, reject) => {
-      const putReq = store.put(snapshot);
-      putReq.onsuccess = () => resolve();
-      putReq.onerror = () => reject(putReq.error);
-    });
+  const transactionCompleted = waitForTransaction(tx);
+  store.put(snapshot);
+  await transactionCompleted;
 
-    // 10件超過時の古いスナップショット削除
-    const allSnapshots = await getAllAutoSaveSnapshots();
-    if (allSnapshots.length > MAX_SNAPSHOTS) {
-      // 日時が古い順にソートして超過分を削除
-      allSnapshots.sort(
-        (a, b) => new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime()
-      );
-      const toDeleteCount = allSnapshots.length - MAX_SNAPSHOTS;
-      const deleteTx = db.transaction(STORE_NAME, 'readwrite');
-      const delStore = deleteTx.objectStore(STORE_NAME);
-      for (let i = 0; i < toDeleteCount; i++) {
-        delStore.delete(allSnapshots[i].id);
-      }
+  // 10件超過時の古いスナップショット削除
+  const allSnapshots = await getAllAutoSaveSnapshots();
+  if (allSnapshots.length > MAX_SNAPSHOTS) {
+    // 日時が古い順にソートして超過分を削除
+    allSnapshots.sort(
+      (a, b) => new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime()
+    );
+    const toDeleteCount = allSnapshots.length - MAX_SNAPSHOTS;
+    const deleteTx = db.transaction(STORE_NAME, 'readwrite');
+    const deleteCompleted = waitForTransaction(deleteTx);
+    const delStore = deleteTx.objectStore(STORE_NAME);
+    for (let i = 0; i < toDeleteCount; i++) {
+      delStore.delete(allSnapshots[i].id);
     }
-  } catch (err) {
-    console.warn('IndexedDB自動保存エラー (編集操作は継続可能です):', err);
+    await deleteCompleted;
   }
+}
+
+function waitForTransaction(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error('IndexedDB transaction failed'));
+    tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction was aborted'));
+  });
 }
 
 /**

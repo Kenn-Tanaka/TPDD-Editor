@@ -104,19 +104,20 @@ npm run build
 
 ## 6. ビルドキットと配布パッケージ生成
 
-本プロジェクトには、WebアプリとLLM Gatewayを一括ビルドし、配布・インストール用ZIPアーカイブ（`release/TPDD_Release_v1.0.0.zip`）を自動生成する**「ビルドキット」**が付属しています。
+本プロジェクトには、Webアプリ、ランチャー、LLM Gatewayを一括ビルドし、展開済み配布物とZIPアーカイブ（`release/TPDD_v1.0.0.zip`）を生成する配布ビルド機能が付属しています。
 
 MinGW（`g++`）がインストールされていない環境であっても、ポータブルツールチェーンを自動調達・一時利用してビルドを完遂します（ビルド完了後に自動クリーンアップ）。
 
 ### 実行方法:
-- **Windows エクスプローラー**: [`build-kit\build.bat`](file:///c:/Users/kenta/Documents/Antigravity_Projects/TPDD-Editor/build-kit/build.bat) をダブルクリック
+- **Windows エクスプローラー**: `packaging\build-release.bat` をダブルクリック
 - **コマンドライン**:
   ```bash
-  npm run build:kit
+  npm run build:release
   ```
 - **生成されるパッケージ (`release/`)**:
-  - **`TPDD_Release_v1.0.0.zip`**: エンドユーザー向け完成バイナリパッケージ（解凍して `start-all.bat` で即起動）
-  - **`TPDD_BuildKit_v1.0.0.zip`**: 他環境配布用ビルドキット一式（解凍した環境単体でビルド可能、自給自足ライブラリ内包、`npm run package:kit` または `build-kit\make-kit.bat` で再生成可能）
+  - **`TPDD_v1.0.0/`**: 展開済みエンドユーザー向け配布物
+  - **`TPDD_v1.0.0.zip`**: ZIP形式の完成バイナリパッケージ（解凍して `TPDD-Launcher.exe` で起動）
+  - **`TPDD_BuildKit_v1.0.0.zip`**: 他環境配布用ビルドキット一式（`npm run package:kit` または `packaging\make-build-kit.bat` で再生成可能）
 
 ---
 
