@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer } from 'react';
 import {
   addLevel,
+  AddLevelParams,
   addNodeToDiagram,
   addEdgeToDiagram,
   createNewProject,
@@ -24,7 +25,7 @@ import {
   redoHistory,
   undoHistory,
 } from '../domain/history';
-import { EdgeKind, NodeKind, NodeStatus, Project, ThoughtNode } from '../domain/schema';
+import { EdgeKind, LevelDefinition, NodeKind, NodeStatus, Project, ThoughtNode } from '../domain/schema';
 import { computeAutoLayout } from '../rendering/autoLayout';
 import { saveAutoSaveSnapshot } from '../services/persistence/indexedDb';
 
@@ -131,8 +132,8 @@ export type AppAction =
   | { type: 'UPDATE_DIAGRAM_TITLE'; diagramId: string; title: string }
   | { type: 'UPDATE_PROJECT_TITLE'; title: string }
   | { type: 'UPDATE_PROJECT_META'; patch: { title?: string; description?: string } }
-  | { type: 'ADD_LEVEL'; label: string }
-  | { type: 'UPDATE_LEVEL'; levelId: string; patch: { label?: string; order?: number } }
+  | { type: 'ADD_LEVEL'; params: AddLevelParams }
+  | { type: 'UPDATE_LEVEL'; levelId: string; patch: Partial<Pick<LevelDefinition, 'label' | 'description' | 'includes' | 'excludes' | 'order'>> }
   | { type: 'REMOVE_LEVEL'; levelIdToRemove: string; targetLevelId: string }
   | { type: 'APPLY_PROJECT_UPDATE'; project: Project }
   | { type: 'SET_NOTIFICATION'; notification: AppNotification | null }
@@ -656,7 +657,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'ADD_LEVEL': {
-      const updatedProj = addLevel(currentProject, action.label);
+      const updatedProj = addLevel(currentProject, action.params);
       return {
         ...state,
         history: pushHistory(state.history, updatedProj),

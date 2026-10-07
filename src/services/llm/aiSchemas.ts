@@ -56,6 +56,31 @@ export const ReviewResponseSchema = z.object({
 });
 export type ReviewResponse = z.infer<typeof ReviewResponseSchema>;
 
+export const LevelDefinitionProposalSchema = z.object({
+  format: z.literal('tpdd-ai-level-definition'),
+  schemaVersion: z.literal(1),
+  task: z.literal('define-level'),
+  description: z.string().min(1, '説明文は必須です').max(1000),
+  includes: z.array(z.string().min(1).max(300)).min(1).max(10),
+  excludes: z.array(z.string().min(1).max(300)).max(10),
+  assumptions: z.array(z.string().min(1).max(500)).max(10).default([]),
+});
+export type LevelDefinitionProposal = z.infer<typeof LevelDefinitionProposalSchema>;
+
+export function validateLevelDefinitionProposal(rawJson: unknown): { valid: boolean; data?: LevelDefinitionProposal; error?: string } {
+  const parsed = LevelDefinitionProposalSchema.safeParse(rawJson);
+  if (!parsed.success) {
+    return { valid: false, error: `スキーマ検証エラー: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')}` };
+  }
+  const unique = (items: string[]) => [...new Set(items.map((item) => item.trim()).filter(Boolean))];
+  const data = { ...parsed.data, description: parsed.data.description.trim(), includes: unique(parsed.data.includes), excludes: unique(parsed.data.excludes) };
+  if (data.includes.length === 0) return { valid: false, error: '含める内容は最低1件必要です。' };
+  const included = new Set(data.includes.map((item) => item.toLocaleLowerCase()));
+  const contradiction = data.excludes.find((item) => included.has(item.toLocaleLowerCase()));
+  if (contradiction) return { valid: false, error: `「${contradiction}」が含める内容と含めない内容の両方にあります。` };
+  return { valid: true, data };
+}
+
 /**
  * 仕様書 9.5: LLMテキスト出力をJSONとして検証・パース
  * 応答全体が単一の ```json ... ``` フェンスで囲まれている場合のみ外枠を除去

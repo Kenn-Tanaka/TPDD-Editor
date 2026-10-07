@@ -1,7 +1,7 @@
 import { Diagram, LevelDefinition, ThoughtNode } from '../../domain/schema';
 import { LlmChatMessage } from './types';
 
-export const PROMPT_VERSION = '1.0.0';
+export const PROMPT_VERSION = '1.1.0';
 
 export interface PromptPayload {
   task: 'expand' | 'alternatives' | 'review';
@@ -131,7 +131,9 @@ export function buildChatMessages(payload: PromptPayload): LlmChatMessage[] {
   }
 
   // 2. ユーザープロンプト (データ入力)
-  const simplifiedLevels = levels.map((l) => ({ id: l.id, label: l.label }));
+  const simplifiedLevels = [...levels]
+    .sort((a, b) => a.order - b.order)
+    .map((l) => ({ id: l.id, label: l.label, description: l.description ?? '', includes: l.includes ?? [], excludes: l.excludes ?? [], order: l.order }));
   const simplifiedNodes = scopedNodes.map((n) => ({
     id: n.id,
     label: n.label,

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Sparkles,
   Square,
@@ -25,11 +25,14 @@ import { RequestPreview } from './RequestPreview';
 import { loadAppSettings } from '../../services/persistence/appStorage';
 import { getModelMetadata } from '../settings/modelCatalog';
 import { NODE_KIND_LABELS } from '../../rendering/svgExport';
+import { AiBusyError, useAiExecution } from '../../app/AiExecutionContext';
 
 export const AiPanel: React.FC = () => {
   const { state, dispatch } = useApp();
   const { present: project, revision: currentRevision } = state.history;
   const { activeDiagramId, selectedNodeId, gatewayToken } = state.ui;
+  const { activeExecution, runExclusive, cancel } = useAiExecution();
+  const isRunning = activeExecution?.owner === 'ai-panel';
 
   const currentDiagram = project.diagrams.find((d) => d.id === activeDiagramId) || project.diagrams[0];
   const focusNode = currentDiagram.nodes.find((n) => n.id === selectedNodeId);
@@ -39,10 +42,8 @@ export const AiPanel: React.FC = () => {
   const [userInstruction, setUserInstruction] = useState('');
 
   // 実行状態
-  const [isRunning, setIsRunning] = useState(false);
   const [streamChars, setStreamChars] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
   // 生成結果
   const [requestRevision, setRequestRevision] = useState<number | null>(null);
@@ -72,13 +73,9 @@ export const AiPanel: React.FC = () => {
     setProposalResult(null);
     setReviewResult(null);
     setStreamChars(0);
-    setIsRunning(true);
 
     // リクエスト開始時のRevisionを記録 (仕様書 4/9.5: Revision不整合ガード)
     setRequestRevision(currentRevision);
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
 
     const payload: PromptPayload = {
       task,
@@ -92,23 +89,24 @@ export const AiPanel: React.FC = () => {
     const settings = loadAppSettings();
 
     try {
-      const response = await gatewayClient.complete(
-        {
-          apiBaseUrl: settings.gatewayUrl,
-          authEnabled: settings.gatewayAuthEnabled,
-          token: gatewayToken,
-        },
-        {
-          modelId: project.aiPreferences.modelId,
-          messages,
-          temperature: project.aiPreferences.temperature,
-          timeoutSeconds: project.aiPreferences.timeoutSeconds,
-          stream: project.aiPreferences.stream,
-          signal: controller.signal,
-        },
-        (chunk) => {
-          setStreamChars((prev) => prev + chunk.length);
-        }
+      const response = await runExclusive(
+        { task, label: task === 'review' ? '図レビュー' : task === 'expand' ? '展開案の生成' : '代替案の生成', owner: 'ai-panel' },
+        (signal) => gatewayClient.complete(
+          {
+            apiBaseUrl: settings.gatewayUrl,
+            authEnabled: settings.gatewayAuthEnabled,
+            token: gatewayToken,
+          },
+          {
+            modelId: project.aiPreferences.modelId,
+            messages,
+            temperature: project.aiPreferences.temperature,
+            timeoutSeconds: project.aiPreferences.timeoutSeconds,
+            stream: project.aiPreferences.stream,
+            signal,
+          },
+          (chunk) => setStreamChars((prev) => prev + chunk.length)
+        )
       );
 
       // JSON パース & 構造検証
@@ -135,22 +133,19 @@ export const AiPanel: React.FC = () => {
         setSelectedCandidates(new Set(vResult.data.nodes.map((n) => n.candidateId)));
       }
     } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
+      if (err instanceof AiBusyError) {
+        setErrorMessage(err.message);
+      } else if (err instanceof DOMException && err.name === 'AbortError') {
         setErrorMessage('リクエストはキャンセルされました。');
       } else {
         setErrorMessage(err instanceof Error ? err.message : String(err));
       }
-    } finally {
-      setIsRunning(false);
-      abortControllerRef.current = null;
     }
   };
 
   // キャンセル
   const handleCancel = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    if (activeExecution?.owner === 'ai-panel') cancel(activeExecution.executionId);
   };
 
   // 候補ノードの選択トグル
@@ -329,7 +324,7 @@ export const AiPanel: React.FC = () => {
         ) : (
           <button
             onClick={handleExecute}
-            disabled={task !== 'review' && !focusNode}
+            disabled={activeExecution !== null || (task !== 'review' && !focusNode)}
             className="w-full py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 text-white rounded font-medium flex items-center justify-center gap-1.5 shadow-sm transition-all"
           >
             <Sparkles className="w-4 h-4" />
@@ -337,6 +332,10 @@ export const AiPanel: React.FC = () => {
           </button>
         )}
       </div>
+
+      {activeExecution && !isRunning && (
+        <p className="text-[11px] text-amber-700">{activeExecution.label}を実行中です。完了または取消後に実行できます。</p>
+      )}
 
       {/* ローディングスピナー */}
       {isRunning && (

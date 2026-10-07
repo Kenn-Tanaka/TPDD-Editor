@@ -1,10 +1,10 @@
 ﻿<#
 .SYNOPSIS
-    ビルドキット自体の配布用ZIP (release/TPDD_BuildKit_v1.0.0.zip) を生成するスクリプト
+    ビルドキット自体の配布用ZIP (release/TPDD_BuildKit_v1.1.0.zip) を生成するスクリプト
 #>
 
 param(
-    [string]$Version = "1.0.0"
+    [string]$Version = "1.1.0"
 )
 
 $ErrorActionPreference = "Stop"

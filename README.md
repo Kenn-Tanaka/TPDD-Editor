@@ -104,7 +104,7 @@ npm run build
 
 ## 6. ビルドキットと配布パッケージ生成
 
-本プロジェクトには、Webアプリ、ランチャー、LLM Gatewayを一括ビルドし、展開済み配布物とZIPアーカイブ（`release/TPDD_v1.0.0.zip`）を生成する配布ビルド機能が付属しています。
+本プロジェクトには、Webアプリ、ランチャー、LLM Gatewayを一括ビルドし、展開済み配布物とZIPアーカイブ（`release/TPDD_v1.1.0.zip`）を生成する配布ビルド機能が付属しています。
 
 MinGW（`g++`）がインストールされていない環境であっても、ポータブルツールチェーンを自動調達・一時利用してビルドを完遂します（ビルド完了後に自動クリーンアップ）。
 
@@ -115,9 +115,9 @@ MinGW（`g++`）がインストールされていない環境であっても、�
   npm run build:release
   ```
 - **生成されるパッケージ (`release/`)**:
-  - **`TPDD_v1.0.0/`**: 展開済みエンドユーザー向け配布物
-  - **`TPDD_v1.0.0.zip`**: ZIP形式の完成バイナリパッケージ（解凍して `TPDD-Launcher.exe` で起動）
-  - **`TPDD_BuildKit_v1.0.0.zip`**: 他環境配布用ビルドキット一式（`npm run package:kit` または `packaging\make-build-kit.bat` で再生成可能）
+  - **`TPDD_v1.1.0/`**: 展開済みエンドユーザー向け配布物
+  - **`TPDD_v1.1.0.zip`**: ZIP形式の完成バイナリパッケージ（解凍して `TPDD-Launcher.exe` で起動）
+  - **`TPDD_BuildKit_v1.1.0.zip`**: 他環境配布用ビルドキット一式（`npm run package:kit` または `packaging\make-build-kit.bat` で再生成可能）
 
 ---
 

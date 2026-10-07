@@ -9,7 +9,7 @@
 - **ワンクリック完全自動ビルド**:
   - Webフロントエンド（TypeScript / React / Vite）の型検査と本番バンドル
   - LLM Gateway（C++20 / cpp-httplib / OpenSSL / Zlib）のスタティック最適化コンパイル
-  - 展開済み配布物とZIPアーカイブ（`release/TPDD_v1.0.0` / `.zip`）の生成
+  - 展開済み配布物とZIPアーカイブ（`release/TPDD_v1.1.0` / `.zip`）の生成
 - **MinGW環境の自動検出と一時調達**:
   - システム上に MinGW-w64 (`g++` / `c++`) が未導入の環境であっても、ポータブル版ツールチェーンを一時的に自動取得・展開してビルドを実行します。
   - ビルド完了後は一時ディレクトリを自動消去するため、**ホストPCのシステム環境変数やレジストリを一切汚しません**。
@@ -40,8 +40,8 @@ cd packaging
 
 ```
 release/
-├── TPDD_v1.0.0/              ★ 展開済み配布用パッケージ
-└── TPDD_v1.0.0.zip           ★ ZIP配布用パッケージ
+├── TPDD_v1.1.0/              ★ 展開済み配布用パッケージ
+└── TPDD_v1.1.0.zip           ★ ZIP配布用パッケージ
 ```
 
 このZIPを解凍すると、そのまま動作するスタンドアロンパッケージ（Webサーバー、Gateway、サンプル、マニュアル、起動バッチ、デスクトップショートカットインストーラー）が展開されます。
@@ -54,7 +54,7 @@ release/
 
 - **Windows エクスプローラー**: `packaging\make-build-kit.bat` をダブルクリック
 - **コマンドライン**: `npm run package:kit`
-- **出力先**: `release/TPDD_BuildKit_v1.0.0.zip` (ソースコード、自給自足deps、ビルドスクリプト一式)
+- **出力先**: `release/TPDD_BuildKit_v1.1.0.zip` (ソースコード、自給自足deps、ビルドスクリプト一式)
 
 ---
 

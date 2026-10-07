@@ -33,6 +33,9 @@ export type EdgeKind = z.infer<typeof EdgeKindSchema>;
 export const LevelDefinitionSchema = z.object({
   id: z.string().min(1, '列IDは空にできません'),
   label: z.string().min(1, '列名は空にできません').max(200, '列名は200文字以内です'),
+  description: z.string().max(1000, '列の説明は1,000文字以内です').optional(),
+  includes: z.array(z.string().min(1).max(300)).max(10).optional(),
+  excludes: z.array(z.string().min(1).max(300)).max(10).optional(),
   order: z.number().int().min(0),
 });
 export type LevelDefinition = z.infer<typeof LevelDefinitionSchema>;

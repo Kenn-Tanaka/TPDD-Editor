@@ -10,11 +10,24 @@ import {
 } from './schema';
 
 export const DEFAULT_LEVELS: LevelDefinition[] = [
-  { id: 'level-requirement', label: '要求', order: 0 },
-  { id: 'level-function', label: '機能', order: 1 },
-  { id: 'level-mechanism', label: '機構', order: 2 },
-  { id: 'level-structure', label: '構造', order: 3 },
+  { id: 'level-requirement', label: '要求', description: '利用者やシステムが満たすべき目的・期待を表します。', includes: ['達成したい目的', '満たすべき要求'], excludes: ['具体的な実現方法'], order: 0 },
+  { id: 'level-function', label: '機能', description: '要求を実現するために必要な働きや振る舞いを表します。', includes: ['必要な機能', '入出力や振る舞い'], excludes: ['具体的な部品構成'], order: 1 },
+  { id: 'level-mechanism', label: '機構', description: '機能を成立させる方式や仕組みを表します。', includes: ['実現方式', '動作原理'], excludes: ['個別部品の詳細構造'], order: 2 },
+  { id: 'level-structure', label: '構造', description: '機構を構成する要素や接続関係を表します。', includes: ['構成要素', '部品間の関係'], excludes: ['上位の目的だけの記述'], order: 3 },
 ];
+
+export interface AddLevelParams {
+  label: string;
+  description?: string;
+  includes?: string[];
+  excludes?: string[];
+}
+
+function normalizeLevelItems(items?: string[]): string[] | undefined {
+  if (!items) return undefined;
+  const normalized = [...new Set(items.map((item) => item.trim().slice(0, 300)).filter(Boolean))].slice(0, 10);
+  return normalized.length > 0 ? normalized : undefined;
+}
 
 export const DEFAULT_MODEL_ID = 'lmstudio/default';
 
@@ -542,7 +555,7 @@ export function updateProjectMeta(
 /**
  * 抽象度列の追加 (1〜12列)
  */
-export function addLevel(project: Project, label: string): Project {
+export function addLevel(project: Project, params: AddLevelParams): Project {
   if (project.levels.length >= 12) {
     throw new Error('抽象度列は最大12列までです');
   }
@@ -550,7 +563,10 @@ export function addLevel(project: Project, label: string): Project {
   const maxOrder = project.levels.reduce((max, l) => Math.max(max, l.order), -1);
   const newLevel: LevelDefinition = {
     id: `level-${generateId().slice(0, 8)}`,
-    label: label.trim() || '新規列',
+    label: params.label.trim() || '新規列',
+    description: params.description?.trim() || undefined,
+    includes: normalizeLevelItems(params.includes),
+    excludes: normalizeLevelItems(params.excludes),
     order: maxOrder + 1,
   };
 
@@ -567,7 +583,7 @@ export function addLevel(project: Project, label: string): Project {
 export function updateLevel(
   project: Project,
   levelId: string,
-  patch: Partial<Pick<LevelDefinition, 'label' | 'order'>>
+  patch: Partial<Pick<LevelDefinition, 'label' | 'description' | 'includes' | 'excludes' | 'order'>>
 ): Project {
   return {
     ...project,
