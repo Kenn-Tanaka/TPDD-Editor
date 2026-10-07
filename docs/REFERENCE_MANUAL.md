@@ -202,7 +202,10 @@ Gatewayから返却されたLLMの出力は、図へ反映される前に厳格�
 ```mermaid
 flowchart LR
   RAW["生テキスト (Markdown/JSON)"] --> FENCE["コードフェンス除去 & 単一JSON抽出"]
-  FENCE --> ZOD["Zod スキーマ検証 (ProposalResponseSchema)"]
+  FENCE --> SHAPE["安全なキー名・メタデータ正規化"]
+  SHAPE --> ZOD["Zod スキーマ検証 (ProposalResponseSchema)"]
+  ZOD -- "形式不一致" --> REPAIR["1回限定の形式修復"]
+  REPAIR --> ZOD
   ZOD --> NORM["エッジ参照の自動正規化 (normalizeRef)"]
   NORM --> CHECK["ID実在性・自己ループ・重複エッジ検査"]
   CHECK --> ADOPT["UI候補プレビュー / 個別選択採用"]
@@ -213,6 +216,9 @@ flowchart LR
 - `candidateIds` に合致する場合 → `candidate:c1` へ自動補正。
 - `existingNodeIds` に合致する場合 → `existing:node-xxx` へ自動補正。
 - コロン前後の不要な空白（`candidate: c1` 等）も自動トリム。
+- `id` / `source` / `target` など意味が一意な一般的キー名は、`candidateId` / `sourceRef` / `targetRef` へ正規化。
+- 形式検証に失敗した場合は、内容の意味を変えずに指定JSON形式へ整える修復推論を1回だけ実行。修復後も全検証を通過しない応答は採用しません。
+- AIの未加工応答はAI支援パネルの折りたたみ欄で確認・コピーできます。認証情報は含まれず、永続保存されません。
 
 ### 4.4 安全な候補採用トランザクション
 - **個別選択チェックボックス**: 提示された候補ノードの中から、必要なものだけを選択採用可能。

@@ -5,12 +5,45 @@ import { validateProject } from '../../src/domain/validation';
 import {
   extractAndParseAiJson,
   ProposalResponse,
+  normalizeProposalShape,
   validateProposalResponse,
   validateReviewResponse,
 } from '../../src/services/llm/aiSchemas';
+import { buildChatMessages } from '../../src/services/llm/prompts';
 import { adoptProposals } from '../../src/features/ai/proposalAdopter';
 
 describe('AI Output Validation & Adoption Transaction (A01 - A05, S02)', () => {
+  it('代替案プロンプトに完全な応答スキーマを含める', () => {
+    const project = createNewProject();
+    const diagram = project.diagrams[0];
+    const messages = buildChatMessages({ task: 'alternatives', diagram, levels: project.levels });
+    expect(messages[0].content).toContain('"format": "tpdd-ai-proposal"');
+    expect(messages[0].content).toContain('"task": "alternatives"');
+    expect(messages[0].content).toContain('"candidateId": "c1"');
+    expect(messages[0].content).toContain('"sourceRef"');
+    expect(messages[0].content).toContain('"targetRef"');
+  });
+
+  it('一般的な別名フィールドだけを安全に正規化する', () => {
+    const raw = {
+      format: 'alternatives',
+      schemaVersion: '1',
+      nodes: [{ id: 'alt1', label: '別方式', kind: 'mechanism', levelId: 'level-mechanism' }],
+      edges: [{ source: 'existing-node', target: 'alt1', kind: 'reference' }],
+    };
+    const normalized = normalizeProposalShape(raw, 'alternatives') as Record<string, unknown>;
+    expect(normalized).toMatchObject({ format: 'tpdd-ai-proposal', schemaVersion: 1, task: 'alternatives' });
+    expect((normalized.nodes as Array<Record<string, unknown>>)[0].candidateId).toBe('alt1');
+    expect((normalized.edges as Array<Record<string, unknown>>)[0]).toMatchObject({ sourceRef: 'existing-node', targetRef: 'alt1' });
+    const validated = validateProposalResponse(raw, {
+      validLevelIds: new Set(['level-mechanism']),
+      existingNodeIds: new Set(['existing-node']),
+      expectedTask: 'alternatives',
+    });
+    expect(validated.valid).toBe(true);
+    expect(validated.data?.edges[0]).toMatchObject({ sourceRef: 'existing:existing-node', targetRef: 'candidate:alt1' });
+  });
+
   it('A01: 単一コードフェンスで囲まれたJSONや純粋JSONを正常にパースできる', () => {
     const rawFenced = `\`\`\`json
 {

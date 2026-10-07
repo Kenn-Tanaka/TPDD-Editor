@@ -11,7 +11,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useApp } from '../../app/AppContext';
-import { buildChatMessages, PromptPayload } from '../../services/llm/prompts';
+import { buildChatMessages, buildProposalRepairMessages, PromptPayload } from '../../services/llm/prompts';
 import { gatewayClient } from '../../services/llm/gatewayClient';
 import {
   extractAndParseAiJson,
@@ -44,6 +44,7 @@ export const AiPanel: React.FC = () => {
   // 実行状態
   const [streamChars, setStreamChars] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [rawResponse, setRawResponse] = useState('');
 
   // 生成結果
   const [requestRevision, setRequestRevision] = useState<number | null>(null);
@@ -73,6 +74,7 @@ export const AiPanel: React.FC = () => {
     setProposalResult(null);
     setReviewResult(null);
     setStreamChars(0);
+    setRawResponse('');
 
     // リクエスト開始時のRevisionを記録 (仕様書 4/9.5: Revision不整合ガード)
     setRequestRevision(currentRevision);
@@ -87,36 +89,55 @@ export const AiPanel: React.FC = () => {
 
     const messages = buildChatMessages(payload);
     const settings = loadAppSettings();
+    const validationContext = {
+      validLevelIds: new Set(project.levels.map((l) => l.id)),
+      existingNodeIds: new Set(currentDiagram.nodes.map((n) => n.id)),
+      existingEdgeIds: new Set(currentDiagram.edges.map((e) => e.id)),
+      expectedTask: task === 'review' ? undefined : task,
+    };
 
     try {
       const response = await runExclusive(
         { task, label: task === 'review' ? '図レビュー' : task === 'expand' ? '展開案の生成' : '代替案の生成', owner: 'ai-panel' },
-        (signal) => gatewayClient.complete(
-          {
+        async (signal) => {
+          const connection = {
             apiBaseUrl: settings.gatewayUrl,
             authEnabled: settings.gatewayAuthEnabled,
             token: gatewayToken,
-          },
-          {
+          };
+          const options = {
             modelId: project.aiPreferences.modelId,
             messages,
             temperature: project.aiPreferences.temperature,
             timeoutSeconds: project.aiPreferences.timeoutSeconds,
             stream: project.aiPreferences.stream,
             signal,
-          },
-          (chunk) => setStreamChars((prev) => prev + chunk.length)
-        )
+          };
+          const first = await gatewayClient.complete(connection, options, (chunk) => setStreamChars((prev) => prev + chunk.length));
+          setRawResponse(first.content);
+          if (task === 'review') return first;
+
+          let firstError = '';
+          try {
+            const checked = validateProposalResponse(extractAndParseAiJson(first.content), validationContext);
+            if (checked.valid) return first;
+            firstError = checked.error ?? 'スキーマ検証に失敗しました。';
+          } catch (error) {
+            firstError = error instanceof Error ? error.message : String(error);
+          }
+
+          const repaired = await gatewayClient.complete(connection, {
+            ...options,
+            messages: buildProposalRepairMessages(task, first.content, firstError),
+            stream: false,
+          });
+          setRawResponse(`【初回応答】\n${first.content}\n\n【形式修復後】\n${repaired.content}`);
+          return repaired;
+        }
       );
 
       // JSON パース & 構造検証
       const rawJson = extractAndParseAiJson(response.content);
-      const validationContext = {
-        validLevelIds: new Set(project.levels.map((l) => l.id)),
-        existingNodeIds: new Set(currentDiagram.nodes.map((n) => n.id)),
-        existingEdgeIds: new Set(currentDiagram.edges.map((e) => e.id)),
-      };
-
       if (task === 'review') {
         const vResult = validateReviewResponse(rawJson, validationContext);
         if (!vResult.valid || !vResult.data) {
@@ -359,6 +380,16 @@ export const AiPanel: React.FC = () => {
           </div>
           <p className="text-[11px] leading-relaxed break-words">{errorMessage}</p>
         </div>
+      )}
+
+      {rawResponse && (
+        <details className="p-2 bg-slate-50 border border-slate-200 rounded text-xs">
+          <summary className="cursor-pointer text-slate-600">AIの未加工応答を表示</summary>
+          <div className="mt-2 flex justify-end">
+            <button type="button" onClick={() => void navigator.clipboard.writeText(rawResponse)} className="px-2 py-1 border border-slate-300 bg-white rounded text-[11px]">応答をコピー</button>
+          </div>
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-[10px] text-slate-700">{rawResponse}</pre>
+        </details>
       )}
 
       {/* Revision不整合警告 */}

@@ -107,6 +107,53 @@ export interface ValidationContext {
   validLevelIds: Set<string>;
   existingNodeIds: Set<string>;
   existingEdgeIds?: Set<string>;
+  expectedTask?: 'expand' | 'alternatives';
+}
+
+/** 明確な別名・メタデータ欠落だけを補正し、内容や参照先の意味は推測しない。 */
+export function normalizeProposalShape(rawJson: unknown, expectedTask?: 'expand' | 'alternatives'): unknown {
+  if (typeof rawJson !== 'object' || rawJson === null || Array.isArray(rawJson)) return rawJson;
+  const raw = rawJson as Record<string, unknown>;
+  if (!Array.isArray(raw.nodes) || !Array.isArray(raw.edges)) return rawJson;
+
+  const aliases = new Map<string, string>();
+  const nodes = raw.nodes.map((value, index) => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+    const node = value as Record<string, unknown>;
+    const oldId = typeof node.candidateId === 'string' ? node.candidateId : typeof node.id === 'string' ? node.id : '';
+    const candidateId = oldId.trim() || `c${index + 1}`;
+    if (oldId.trim()) aliases.set(oldId.trim(), candidateId);
+    return { ...node, candidateId };
+  });
+
+  const normalizeEndpoint = (value: unknown): unknown => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    if (trimmed.startsWith('candidate:')) {
+      const id = trimmed.slice('candidate:'.length).trim();
+      return `candidate:${aliases.get(id) ?? id}`;
+    }
+    return aliases.get(trimmed) ?? trimmed;
+  };
+  const edges = raw.edges.map((value) => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+    const edge = value as Record<string, unknown>;
+    return {
+      ...edge,
+      sourceRef: normalizeEndpoint(edge.sourceRef ?? edge.source ?? edge.sourceId),
+      targetRef: normalizeEndpoint(edge.targetRef ?? edge.target ?? edge.targetId),
+    };
+  });
+
+  return {
+    ...raw,
+    format: 'tpdd-ai-proposal',
+    schemaVersion: 1,
+    task: raw.task ?? expectedTask,
+    summary: raw.summary ?? 'AIによる提案',
+    nodes,
+    edges,
+  };
 }
 
 /**
@@ -116,13 +163,16 @@ export function validateProposalResponse(
   rawJson: unknown,
   context: ValidationContext
 ): { valid: boolean; data?: ProposalResponse; error?: string } {
-  const parseResult = ProposalResponseSchema.safeParse(rawJson);
+  const parseResult = ProposalResponseSchema.safeParse(normalizeProposalShape(rawJson, context.expectedTask));
   if (!parseResult.success) {
     const msg = parseResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
     return { valid: false, error: `スキーマ検証エラー: ${msg}` };
   }
 
   const data = parseResult.data;
+  if (context.expectedTask && data.task !== context.expectedTask) {
+    return { valid: false, error: `タスク種別が不一致です（期待: ${context.expectedTask}, 応答: ${data.task}）。` };
+  }
 
   // candidateId の重複チェック
   const candidateIds = new Set<string>();
