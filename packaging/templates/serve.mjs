@@ -77,7 +77,7 @@ server.on('error', (err) => {
 
 server.listen(PORT, HOST, () => {
   console.log('====================================================');
-  console.log('  思考展開図エディタ (TPDD) サーバー起動中');
+  console.log('  思考展開図エディタ (TPDD Editor) サーバー起動中');
   console.log(`  URL: http://${HOST}:${PORT}`);
   console.log('  ※ ブラウザで上記URLを開いてご利用ください。');
   console.log('  ※ 終了する場合は Ctrl+C を押してください。');

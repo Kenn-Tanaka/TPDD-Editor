@@ -75,7 +75,7 @@ export function buildChatMessages(payload: PromptPayload): LlmChatMessage[] {
 選択されたフォーカスノード（要求や機能など）を具体化・ブレークダウンする「候補ノード（1〜6件）」および関連付ける「候補エッジ」を提案してください。
 出力形式:
 {
-  "format": "thought-expansion-ai",
+  "format": "tpdd-ai-proposal",
   "schemaVersion": 1,
   "task": "expand",
   "summary": "要約文",
@@ -106,14 +106,14 @@ export function buildChatMessages(payload: PromptPayload): LlmChatMessage[] {
     systemContent += `
 【代替案タスクの要件】
 選択されたフォーカスノードに対する「別の実現方法・代替アプローチ（1〜4件）」を提案してください。
-出力形式は展開案と同じ thought-expansion-ai 形式で、taskを "alternatives" としてください。`;
+出力形式は展開案と同じ tpdd-ai-proposal 形式で、taskを "alternatives" としてください。`;
   } else if (task === 'review') {
     systemContent += `
 【図レビュータスクの要件】
 現在図全体を精査し、要求の抜け漏れ(missing)、矛盾(conflict)、曖昧表現(ambiguity)、要検証事項(verification)を指摘してください（最大10件）。
 出力形式:
 {
-  "format": "thought-expansion-review",
+  "format": "tpdd-ai-review",
   "schemaVersion": 1,
   "task": "review",
   "summary": "全体の講評要約",

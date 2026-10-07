@@ -1,6 +1,6 @@
-# 思考展開図エディタ (TPDD) ビルドキット
+# 思考展開図エディタ（TPDD Editor）ビルドキット
 
-本フォルダは、「思考展開図エディタ (Thinking Process Development Diagram Editor - TPDD)」および「Lightweight LLM Gateway」をビルドし、配布・インストール用ZIPパッケージを自動生成するためのビルドキットです。
+本フォルダは、「思考展開図エディタ」（Thinking Process Development Diagram Editor / TPDD Editor）および「Lightweight LLM Gateway」をビルドし、配布・インストール用ZIPパッケージを自動生成するためのビルドキットです。
 
 ---
 

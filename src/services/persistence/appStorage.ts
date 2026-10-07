@@ -4,7 +4,8 @@ export interface AppSettings {
   favoriteModelIds: string[];
 }
 
-const STORAGE_KEY = 'thought_expansion_settings';
+const STORAGE_KEY = 'tpdd_editor_settings';
+const LEGACY_STORAGE_KEY = 'thought_expansion_settings';
 
 export const DEFAULT_GATEWAY_URL = 'http://127.0.0.1:8765/v1';
 
@@ -59,7 +60,7 @@ export function loadAppSettings(): AppSettings {
     return { ...DEFAULT_APP_SETTINGS };
   }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return { ...DEFAULT_APP_SETTINGS };
 
     const parsed = JSON.parse(raw);

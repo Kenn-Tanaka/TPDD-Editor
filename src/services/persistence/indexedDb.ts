@@ -9,7 +9,7 @@ export interface AutoSaveSnapshot {
   project: Project;
 }
 
-const DB_NAME = 'ThoughtExpansionDB';
+const DB_NAME = 'TPDDEditorDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'autosave_snapshots';
 const MAX_SNAPSHOTS = 10;

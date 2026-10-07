@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "====================================================" -ForegroundColor Cyan
-Write-Host "  Thinking Process Development Diagram Editor (TPDD) Launcher" -ForegroundColor Cyan
+Write-Host "  Thinking Process Development Diagram Editor (TPDD Editor) Launcher" -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
 
 # 1. Node.js Check

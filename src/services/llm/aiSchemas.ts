@@ -26,7 +26,7 @@ export type EdgeProposal = z.infer<typeof EdgeProposalSchema>;
 
 // 展開案・代替案レスポンス
 export const ProposalResponseSchema = z.object({
-  format: z.literal('thought-expansion-ai'),
+  format: z.literal('tpdd-ai-proposal'),
   schemaVersion: z.literal(1),
   task: z.enum(['expand', 'alternatives']),
   summary: z.string().max(2000, '要約は2000文字以内です'),
@@ -48,7 +48,7 @@ export type ReviewIssue = z.infer<typeof ReviewIssueSchema>;
 
 // レビューレスポンス
 export const ReviewResponseSchema = z.object({
-  format: z.literal('thought-expansion-review'),
+  format: z.literal('tpdd-ai-review'),
   schemaVersion: z.literal(1),
   task: z.literal('review'),
   summary: z.string().max(2000, '要約は2000文字以内です'),

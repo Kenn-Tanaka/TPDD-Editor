@@ -1,6 +1,6 @@
-# 思考展開図エディタ (TPDD) 成果物パッケージ
+# 思考展開図エディタ（TPDD Editor）成果物パッケージ
 
-本フォルダは、「思考展開図エディタ (Thinking Process Development Diagram Editor - TPDD)」の完成パッケージ一式です。
+本フォルダは、「思考展開図エディタ」（Thinking Process Development Diagram Editor / TPDD Editor）の完成パッケージ一式です。
 ビルド済みWebアプリケーション、CORS修正済みLLM Gateway、起動スクリプト、サンプルデータをまとめています。
 
 ---
@@ -25,7 +25,8 @@ TPDD_v<バージョン>/
 │   └── start-gateway.bat       # LLM Gateway単体起動バッチ
 │
 ├── samples/                    # サンプル思考展開図データ
-│   └── sample-project.thought.json  # 「スマートオフィス環境制御システム」展開図例
+│   ├── sample-project.tpdd.json     # 現行形式のサンプル
+│   └── sample-project.thought.json  # 旧形式の互換確認用サンプル
 │
 └── docs/                       # 仕様・設計・マニュアル資料
     ├── QUICKSTART.md           ★ 10分でわかるクイックスタートガイド
@@ -56,7 +57,7 @@ TPDD_v<バージョン>/
 ## 3. サンプル展開図の読み込み
 
 1. エディタ画面（ブラウザ）の左上ツールバーにある **「ファイル読込」** ボタンをクリックします。
-2. `samples\sample-project.thought.json` を選択します。
+2. `samples\sample-project.tpdd.json` を選択します。
 3. 「要求」「機能」「機構」「構造」の4列に展開されたスマートオフィス環境制御システムの図が表示されます。
 4. ノード「エリア別最適空調制御」をダブルクリックすると、子階層のサブ図（温湿度フィードバック制御）へ遷移できます。
 5. パンくずリスト「ルート展開図」をクリックすると、親の全体図へ戻ります。

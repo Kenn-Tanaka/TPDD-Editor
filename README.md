@@ -1,8 +1,8 @@
-# 思考展開図エディタ (Thinking Process Development Diagram Editor - TPDD)
+# 思考展開図エディタ / Thinking Process Development Diagram Editor
 
-要求、機能、機構、構造、制約、メモをノードとして配置し、ノード間の関係と詳細化の階層を編集するフロントエンド完結型の「思考展開図エディタ（Thinking Process Development Diagram Editor - TPDD）」です。
+要求、機能、機構、構造、制約、メモをノードとして配置し、ノード間の関係と詳細化の階層を編集するフロントエンド完結型の「思考展開図エディタ」（英語名: Thinking Process Development Diagram Editor、短縮名: TPDD Editor）です。
 
-作成したプロジェクトをJSON（`.tpdd.json` / `.thought.json`）で保存し、現在の図を外部アプリケーション（Word、PowerPoint等）でも崩れず貼り付け可能な標準SVGとして出力できます。
+作成したプロジェクトをJSON（`.tpdd.json`、旧 `.thought.json` 互換）で保存し、現在の図を外部アプリケーション（Word、PowerPoint等）でも崩れず貼り付け可能な標準SVGとして出力できます。
 また、ローカルのLightweight LLM Gateway経由でLLMと連携し、選択したノードの展開案・代替案の生成や図全体のレビュー支援を行います。LLMの出力は候補として提示され、ユーザーが明示的に選択採用した内容のみが同じ検証・履歴処理を通して図へ反映されます。
 
 ---
@@ -134,7 +134,7 @@ src/
 ├── services/
 │   ├── llm/              # Gatewayクライアント、SSEパーサー、プロンプト定義、応答Zod検証
 │   ├── rag/              # 将来のRAG共通型・境界インターフェース定義
-│   └── persistence/      # .thought.json入出力、IndexedDB自動保存、端末設定
+│   └── persistence/      # .tpdd.json入出力、IndexedDB自動保存、端末設定
 ├── rendering/            # CTM逆行列座標変換、接続点計算、日本語折り返し、SVGエクスポート、自動レイアウト
 scripts/                  # 配布用静的HTTPサーバー (serve-dist.mjs)、Windows起動スクリプト (start-dist.bat)
 tests/                    # 単体・結合テスト、大規模フィクスチャ(200ノード/400エッジ)

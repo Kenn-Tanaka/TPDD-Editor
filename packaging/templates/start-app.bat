@@ -4,7 +4,7 @@ cd /d "%~dp0"
 title TPDD Editor (Port 3000)
 
 echo ====================================================
-echo   Thinking Process Development Diagram Editor (TPDD)
+echo   Thinking Process Development Diagram Editor (TPDD Editor)
 echo ====================================================
 
 where node >nul 2>nul

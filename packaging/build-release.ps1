@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Thinking Process Development Diagram Editor (TPDD) Complete Build Kit
+    Thinking Process Development Diagram Editor (TPDD Editor) Complete Build Kit
 .DESCRIPTION
     Builds the web frontend and LLM Gateway, packaging everything into a release zip.
     Temporarily provisions portable MinGW-w64 if not installed.
@@ -15,7 +15,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 Write-Host "====================================================" -ForegroundColor Cyan
-Write-Host "  Thinking Process Development Diagram Editor (TPDD) Build Kit" -ForegroundColor Cyan
+Write-Host "  Thinking Process Development Diagram Editor (TPDD Editor) Build Kit" -ForegroundColor Cyan
 Write-Host "  Version: $Version" -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
 

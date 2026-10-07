@@ -74,7 +74,7 @@ export const Toolbar: React.FC = () => {
     }
   };
 
-  // 保存 (.thought.json)
+  // 保存 (.tpdd.json)
   const handleSaveJson = () => {
     saveProjectToFile(project);
     dispatch({
@@ -187,7 +187,8 @@ export const Toolbar: React.FC = () => {
       <div className="flex items-center gap-1.5">
         <div className="flex items-center gap-2 mr-3 font-semibold text-slate-800 text-sm">
           <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
-          思考展開図エディタ (TPDD)
+          思考展開図エディタ
+          <span className="ml-1 text-slate-500 font-normal">TPDD Editor</span>
         </div>
 
         <button

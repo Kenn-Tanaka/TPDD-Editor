@@ -4,7 +4,7 @@ cd /d "%~dp0"
 title TPDD Build Kit Packager
 
 echo ====================================================
-echo   Thinking Process Development Diagram Editor (TPDD)
+echo   Thinking Process Development Diagram Editor (TPDD Editor)
 echo   Package Build Kit into ZIP
 echo ====================================================
 

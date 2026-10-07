@@ -1,7 +1,7 @@
-# 思考展開図エディタ (TPDD) 仕様書サマリー
+# 思考展開図エディタ（TPDD Editor）仕様書サマリー
 
 ## 1. システム概要
-要求、機能、機構、構造、制約、メモをノードとして配置し、ノード間の関係と詳細化の階層を編集するフロントエンド完結型の「思考展開図エディタ（Thinking Process Development Diagram Editor - TPDD）」である。
+要求、機能、機構、構造、制約、メモをノードとして配置し、ノード間の関係と詳細化の階層を編集するフロントエンド完結型の「思考展開図エディタ」（英語名: Thinking Process Development Diagram Editor、短縮名: TPDD Editor）である。
 作成したプロジェクトをJSON（`.tpdd.json`、旧 `.thought.json` 互換）で保存し、現在の図をMicrosoft Office（Word/PowerPoint等）でも欠落・文字化けなく貼り付け可能な標準SVGとして出力する。
 また、ローカルのLightweight LLM Gateway経由でLLMと連携し、選択ノードの展開案・代替案の生成や図のレビュー支援を行う。
 

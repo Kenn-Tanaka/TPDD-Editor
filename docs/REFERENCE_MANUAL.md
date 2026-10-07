@@ -1,7 +1,7 @@
-# 思考展開図エディタ (Thinking Process Development Diagram Editor - TPDD) リファレンスマニュアル
+# 思考展開図エディタ / Thinking Process Development Diagram Editor リファレンスマニュアル
 
 版: 1.0  
-対象: 思考展開図エディタ (TPDD) 全機能  
+対象: 思考展開図エディタ（TPDD Editor）全機能
 動作環境: Windows 10/11 (Chrome / Edge / Firefox)
 
 ---
@@ -22,7 +22,7 @@
 ## 第1章 システム概要とアーキテクチャ
 
 ### 1.1 目的と設計思想
-思考展開図エディタ (TPDD) は、要求・機能・機構・構造・制約・メモをノードとして配置し、ノード間の依存関係や詳細化の階層構造を直感的にモデリングできるフロントエンド完結型SPA (Single Page Application) です。
+思考展開図エディタ（英語名: Thinking Process Development Diagram Editor、短縮名: TPDD Editor）は、要求・機能・機構・構造・制約・メモをノードとして配置し、ノード間の依存関係や詳細化の階層構造を直感的にモデリングできるフロントエンド完結型SPA (Single Page Application) です。
 
 - **純粋なフロントエンド完結 (Pure Client-Side)**:  
   専用の推論バックエンドやサーバー側データベースを必要とせず、ブラウザ単体で完全に動作します。Gatewayが停止しているオフライン環境でも、図編集、保存、読込、自動保存、SVGエクスポートが100%機能します。
@@ -230,7 +230,7 @@ flowchart LR
 本エディタは、ローカルPC上で動作する「Lightweight LLM Gateway」（既定: `http://127.0.0.1:8765/v1`）を経由して各LLMと通信します。
 
 ```
-[TPDD ブラウザ (3000/5173)]
+[TPDD Editor ブラウザ (3000/5173)]
         │ HTTP (CORS 204/200, SSE)
         ▼
 [Lightweight LLM Gateway (8765)]
@@ -391,7 +391,7 @@ export interface ThoughtEdge {
 
 ### Q2. 「LLM-Gatewayとの通信に失敗しました」というエラーが表示される
 - **原因 1: Gateway が起動していない**:  
-  `deliverables\gateway\start-gateway.bat` を起動して、黒いウィンドウで「Gateway API: http://127.0.0.1:8765/v1」と表示されていることを確認してください。
+  配布フォルダの `gateway\start-gateway.bat` を起動して、黒いウィンドウで「Gateway API: http://127.0.0.1:8765/v1」と表示されていることを確認してください。
 - **原因 2: Gatewayの設定URLの誤り**:  
   エディタ画面の左ペイン下部「LLM設定」歯車アイコンを開き、Gateway URLが `http://127.0.0.1:8765/v1` になっていることを確認し、「接続テスト」を実行してください。
 

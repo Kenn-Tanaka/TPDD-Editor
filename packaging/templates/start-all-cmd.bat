@@ -4,7 +4,7 @@ cd /d "%~dp0"
 title TPDD Launcher
 
 echo ====================================================
-echo   Thinking Process Development Diagram Editor (TPDD) Launcher
+echo   Thinking Process Development Diagram Editor (TPDD Editor) Launcher
 echo ====================================================
 
 where node >nul 2>nul

@@ -1,7 +1,7 @@
-# Thinking Process Development Diagram Editor (TPDD) - AGENTS.md
+# Thinking Process Development Diagram Editor (TPDD Editor) - AGENTS.md
 
 ## 1. Project Overview (プロジェクト概要)
-本プロジェクトは、要求・機能・機構・構造・制約・メモをノードとして配置し、ノード間の関係と詳細化の階層を編集するフロントエンド完結型の「思考展開図エディタ（Thinking Process Development Diagram Editor - TPDD）」である。
+本プロジェクトは、要求・機能・機構・構造・制約・メモをノードとして配置し、ノード間の関係と詳細化の階層を編集するフロントエンド完結型の「思考展開図エディタ」（英語名: Thinking Process Development Diagram Editor、短縮名: TPDD Editor）である。
 作成したプロジェクトをJSON（`.tpdd.json` / `.thought.json`）で保存し、現在の図を標準SVGで出力する。
 また、ローカルのLightweight LLM Gateway経由でLLMと連携し、選択したノードの展開案・代替案の生成や図のレビュー支援を行う。LLMの出力は候補として提示し、ユーザーが明示的に選択採用した内容のみを同じ検証・履歴処理を通して図へ反映する。
 

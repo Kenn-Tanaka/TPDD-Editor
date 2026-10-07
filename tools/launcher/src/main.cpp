@@ -156,7 +156,7 @@ int wmain() {
   try {
     const Layout layout = resolveLayout(executableDirectory());
 
-    std::wcout << L"Thinking Process Development Diagram Editor (TPDD)\n\n";
+    std::wcout << L"Thinking Process Development Diagram Editor (TPDD Editor)\n\n";
 
     if (!isPortOpen(kGatewayPort)) {
       if (!fs::exists(layout.gatewayExe)) {

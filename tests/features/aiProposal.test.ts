@@ -14,7 +14,7 @@ describe('AI Output Validation & Adoption Transaction (A01 - A05, S02)', () => {
   it('A01: 単一コードフェンスで囲まれたJSONや純粋JSONを正常にパースできる', () => {
     const rawFenced = `\`\`\`json
 {
-  "format": "thought-expansion-ai",
+  "format": "tpdd-ai-proposal",
   "schemaVersion": 1,
   "task": "expand",
   "summary": "展開案の要約",
@@ -47,7 +47,7 @@ describe('AI Output Validation & Adoption Transaction (A01 - A05, S02)', () => {
 
   it('A01: 図レビュー応答の検証 (実在ノードID参照の確認)', () => {
     const validReview = {
-      format: 'thought-expansion-review',
+      format: 'tpdd-ai-review',
       schemaVersion: 1,
       task: 'review',
       summary: 'レビュー講評',
@@ -84,7 +84,7 @@ describe('AI Output Validation & Adoption Transaction (A01 - A05, S02)', () => {
 
   it('A01: 存在しないlevelIdや未解決参照を含む不正なAI出力は拒否される', () => {
     const badJson = {
-      format: 'thought-expansion-ai',
+      format: 'tpdd-ai-proposal',
       schemaVersion: 1,
       task: 'expand',
       summary: 'テスト',
@@ -122,7 +122,7 @@ describe('AI Output Validation & Adoption Transaction (A01 - A05, S02)', () => {
 
   it('A01: Gemma4-26B等のモデルがプレフィックスを省略（c2 や node-1）した場合も自動正規化して解決できる', () => {
     const jsonFromGemma = {
-      format: 'thought-expansion-ai',
+      format: 'tpdd-ai-proposal',
       schemaVersion: 1,
       task: 'expand',
       summary: 'Gemmaによる展開案',
@@ -191,7 +191,7 @@ describe('AI Output Validation & Adoption Transaction (A01 - A05, S02)', () => {
     });
 
     const proposal: ProposalResponse = {
-      format: 'thought-expansion-ai',
+      format: 'tpdd-ai-proposal',
       schemaVersion: 1,
       task: 'expand',
       summary: '2つの候補案',
@@ -275,7 +275,7 @@ describe('AI Output Validation & Adoption Transaction (A01 - A05, S02)', () => {
     let history = createHistoryState(project);
 
     const proposal: ProposalResponse = {
-      format: 'thought-expansion-ai',
+      format: 'tpdd-ai-proposal',
       schemaVersion: 1,
       task: 'expand',
       summary: 'テスト',
@@ -314,7 +314,7 @@ describe('AI Output Validation & Adoption Transaction (A01 - A05, S02)', () => {
 
   it('S02: AI出力に悪意あるスクリプトやHTMLが含まれていても安全にプレーンテキストとして扱われる', () => {
     const xssPayload = {
-      format: 'thought-expansion-ai',
+      format: 'tpdd-ai-proposal',
       schemaVersion: 1,
       task: 'expand',
       summary: '<script>alert("xss")</script>',
@@ -372,7 +372,7 @@ describe('AI Output Validation & Adoption Transaction (A01 - A05, S02)', () => {
 
     // サブ図に対して提案を採用
     const proposal: ProposalResponse = {
-      format: 'thought-expansion-ai',
+      format: 'tpdd-ai-proposal',
       schemaVersion: 1,
       task: 'expand',
       summary: 'サブ図の展開案',
