@@ -1,9 +1,11 @@
 import { Diagram, LevelDefinition, ThoughtNode } from '../../domain/schema';
 import { LlmChatMessage } from './types';
+import { getRuntimeConfig } from '../../config/runtimeConfig';
 
 export const PROMPT_VERSION = '1.1.0';
 
 function proposalOutputFormat(task: 'expand' | 'alternatives'): string {
+  const config = getRuntimeConfig();
   return `出力形式（キー名・型を変更しないこと）:
 {
   "format": "tpdd-ai-proposal",
@@ -13,7 +15,7 @@ function proposalOutputFormat(task: 'expand' | 'alternatives'): string {
   "nodes": [
     {
       "candidateId": "c1",
-      "label": "ノード名（200文字以内）",
+      "label": "ノード名（${config.nameMaxChars}文字以内）",
       "kind": "function",
       "levelId": "送信データにある実在の列ID",
       "description": "詳細説明",
@@ -47,7 +49,7 @@ export function buildProposalRepairMessages(
     },
     {
       role: 'user',
-      content: `<DATA>\n検証エラー: ${validationError}\n修復対象の応答:\n${invalidResponse.slice(0, 50000)}\n</DATA>`,
+      content: `<DATA>\n検証エラー: ${validationError}\n修復対象の応答:\n${Array.from(invalidResponse).slice(0, getRuntimeConfig().aiRepairInputMaxChars).join('')}\n</DATA>`,
     },
   ];
 }
@@ -132,7 +134,7 @@ ${proposalOutputFormat('alternatives')}`;
   } else if (task === 'review') {
     systemContent += `
 【図レビュータスクの要件】
-現在図全体を精査し、要求の抜け漏れ(missing)、矛盾(conflict)、曖昧表現(ambiguity)、要検証事項(verification)を指摘してください（最大10件）。
+現在図全体を精査し、要求の抜け漏れ(missing)、矛盾(conflict)、曖昧表現(ambiguity)、要検証事項(verification)を指摘してください（最大${getRuntimeConfig().aiReviewMaxIssues}件）。
 出力形式:
 {
   "format": "tpdd-ai-review",

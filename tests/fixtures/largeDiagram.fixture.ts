@@ -60,7 +60,7 @@ export function createLargeDiagramProject(nodeCount = 200, edgeCount = 400): Pro
   }
 
   return {
-    format: 'thought-expansion-project',
+    format: 'tpdd-project',
     schemaVersion: 1,
     id: 'large-project-1',
     title: '大規模思考展開図 (200ノード・400エッジ)',

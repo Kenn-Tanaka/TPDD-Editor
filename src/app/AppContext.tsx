@@ -10,6 +10,7 @@ import {
   removeEdgeFromDiagram,
   removeLevelWithReassign,
   removeNodeWithDescendants,
+  reorderLevels,
   updateDiagramTitle,
   updateEdgeInDiagram,
   updateLevel,
@@ -25,9 +26,10 @@ import {
   redoHistory,
   undoHistory,
 } from '../domain/history';
-import { EdgeKind, LevelDefinition, NodeKind, NodeStatus, Project, ThoughtNode } from '../domain/schema';
+import { AiPreferences, EdgeKind, LevelDefinition, NodeKind, NodeStatus, Project, ThoughtNode } from '../domain/schema';
 import { computeAutoLayout } from '../rendering/autoLayout';
 import { saveAutoSaveSnapshot } from '../services/persistence/indexedDb';
+import { getRuntimeConfig } from '../config/runtimeConfig';
 
 // 一時UI状態
 export interface Viewport {
@@ -125,6 +127,7 @@ export type AppAction =
   | { type: 'SET_RIGHT_TAB'; tab: 'detail' | 'ai' }
   | { type: 'SET_GATEWAY_TOKEN'; token: string }
   | { type: 'UPDATE_PROJECT_MODEL'; modelId: string }
+  | { type: 'UPDATE_AI_PREFERENCES'; patch: Partial<Omit<AiPreferences, 'modelId'>> }
   // 段階2: 階層・列・自動配置操作
   | { type: 'AUTO_LAYOUT' }
   | { type: 'CREATE_SUB_DIAGRAM'; parentNodeId: string }
@@ -134,6 +137,7 @@ export type AppAction =
   | { type: 'UPDATE_PROJECT_META'; patch: { title?: string; description?: string } }
   | { type: 'ADD_LEVEL'; params: AddLevelParams }
   | { type: 'UPDATE_LEVEL'; levelId: string; patch: Partial<Pick<LevelDefinition, 'label' | 'description' | 'includes' | 'excludes' | 'order'>> }
+  | { type: 'REORDER_LEVELS'; orderedLevelIds: string[] }
   | { type: 'REMOVE_LEVEL'; levelIdToRemove: string; targetLevelId: string }
   | { type: 'APPLY_PROJECT_UPDATE'; project: Project }
   | { type: 'SET_NOTIFICATION'; notification: AppNotification | null }
@@ -672,6 +676,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
 
+    case 'UPDATE_AI_PREFERENCES': {
+      const updated: Project = {
+        ...currentProject,
+        updatedAt: new Date().toISOString(),
+        aiPreferences: { ...currentProject.aiPreferences, ...action.patch },
+      };
+      return { ...state, history: pushHistory(state.history, updated) };
+    }
+
+    case 'REORDER_LEVELS': {
+      const updatedProj = reorderLevels(currentProject, action.orderedLevelIds);
+      return { ...state, history: pushHistory(state.history, updatedProj) };
+    }
+
     case 'REMOVE_LEVEL': {
       const updatedProj = removeLevelWithReassign(
         currentProject,
@@ -743,6 +761,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [autoSaveStatus, setAutoSaveStatus] = React.useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [lastAutoSavedTime, setLastAutoSavedTime] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (!state.history.lastValidationError) return;
+    dispatch({
+      type: 'SET_NOTIFICATION',
+      notification: {
+        id: `validation-${state.history.rejectedUpdateCount}`,
+        type: 'error',
+        message: `変更を適用できません: ${state.history.lastValidationError}`,
+      },
+    });
+  }, [state.history.rejectedUpdateCount, state.history.lastValidationError]);
+
   // 仕様書 7.2: Project確定変更後、1秒のdebounceでIndexedDBへ保存
   React.useEffect(() => {
     // ノードが0件の空プロジェクト（初期状態や未編集）は復旧候補として無駄に保存しない
@@ -762,7 +792,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('AutoSave failed:', e);
         setAutoSaveStatus('error');
       }
-    }, 1000);
+    }, getRuntimeConfig().autosaveIntervalMs);
 
     return () => clearTimeout(timer);
   }, [state.history.present]);

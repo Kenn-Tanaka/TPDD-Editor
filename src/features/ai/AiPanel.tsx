@@ -26,6 +26,8 @@ import { loadAppSettings } from '../../services/persistence/appStorage';
 import { getModelMetadata } from '../settings/modelCatalog';
 import { NODE_KIND_LABELS } from '../../rendering/svgExport';
 import { AiBusyError, useAiExecution } from '../../app/AiExecutionContext';
+import { getRuntimeConfig } from '../../config/runtimeConfig';
+import { createTaskDeadline } from '../../services/llm/deadline';
 
 export const AiPanel: React.FC = () => {
   const { state, dispatch } = useApp();
@@ -45,6 +47,7 @@ export const AiPanel: React.FC = () => {
   const [streamChars, setStreamChars] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState('');
+  const [repairNotice, setRepairNotice] = useState<string | null>(null);
 
   // 生成結果
   const [requestRevision, setRequestRevision] = useState<number | null>(null);
@@ -75,6 +78,7 @@ export const AiPanel: React.FC = () => {
     setReviewResult(null);
     setStreamChars(0);
     setRawResponse('');
+    setRepairNotice(null);
 
     // リクエスト開始時のRevisionを記録 (仕様書 4/9.5: Revision不整合ガード)
     setRequestRevision(currentRevision);
@@ -89,6 +93,9 @@ export const AiPanel: React.FC = () => {
 
     const messages = buildChatMessages(payload);
     const settings = loadAppSettings();
+    const executionConfig = getRuntimeConfig();
+    const taskTimeoutMs = project.aiPreferences.timeoutSeconds * 1000;
+    const deadline = createTaskDeadline(taskTimeoutMs);
     const validationContext = {
       validLevelIds: new Set(project.levels.map((l) => l.id)),
       existingNodeIds: new Set(currentDiagram.nodes.map((n) => n.id)),
@@ -109,7 +116,7 @@ export const AiPanel: React.FC = () => {
             modelId: project.aiPreferences.modelId,
             messages,
             temperature: project.aiPreferences.temperature,
-            timeoutSeconds: project.aiPreferences.timeoutSeconds,
+            timeoutMs: deadline.remainingMs(),
             stream: project.aiPreferences.stream,
             signal,
           };
@@ -126,10 +133,19 @@ export const AiPanel: React.FC = () => {
             firstError = error instanceof Error ? error.message : String(error);
           }
 
+          if (!executionConfig.aiAutoRepairEnabled) {
+            throw new Error(`${firstError}（形式の自動修復は運用設定で無効です）`);
+          }
+          if (signal.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
+          const repairRemainingMs = deadline.remainingMs();
+          if (repairRemainingMs <= 0) throw new Error(`${firstError}（AIタスク全体の期限に達したため形式修復を実行できません）`);
+
+          setRepairNotice('初回応答が形式検証に失敗したため、残り時間で形式修復を実行しました。');
           const repaired = await gatewayClient.complete(connection, {
             ...options,
             messages: buildProposalRepairMessages(task, first.content, firstError),
             stream: false,
+            timeoutMs: repairRemainingMs,
           });
           setRawResponse(`【初回応答】\n${first.content}\n\n【形式修復後】\n${repaired.content}`);
           return repaired;
@@ -380,6 +396,10 @@ export const AiPanel: React.FC = () => {
           </div>
           <p className="text-[11px] leading-relaxed break-words">{errorMessage}</p>
         </div>
+      )}
+
+      {repairNotice && (
+        <div className="p-2.5 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800">{repairNotice}</div>
       )}
 
       {rawResponse && (

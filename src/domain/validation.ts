@@ -1,4 +1,5 @@
 import { Project, ProjectSchema } from './schema';
+import { getRuntimeConfig } from '../config/runtimeConfig';
 
 export interface ValidationError {
   path: string;
@@ -46,6 +47,16 @@ export function validateProject(project: Project): ValidationResult {
       });
     }
     orders.add(level.order);
+
+    const included = new Set((level.includes ?? []).map((item) => item.trim().toLocaleLowerCase()));
+    for (const excluded of level.excludes ?? []) {
+      if (included.has(excluded.trim().toLocaleLowerCase())) {
+        errors.push({
+          path: `levels.${level.id}.excludes`,
+          message: `「${excluded}」を「含める内容」と「含めない内容」の両方には指定できません`,
+        });
+      }
+    }
   }
 
   // rootDiagramIdの存在チェック
@@ -232,17 +243,17 @@ export function validateProject(project: Project): ValidationResult {
     }
   }
 
-  // 上限値チェック (仕様書第12章: 合計5,000ノード、10,000エッジ)
-  if (totalNodes > 5000) {
+  const config = getRuntimeConfig();
+  if (totalNodes > config.projectNodeMaxCount) {
     errors.push({
       path: 'totalNodes',
-      message: `Project全体の合計ノード数 (${totalNodes}) が上限5000を超えています`,
+      message: `Project全体の合計ノード数 (${totalNodes}) が上限${config.projectNodeMaxCount}を超えています`,
     });
   }
-  if (totalEdges > 10000) {
+  if (totalEdges > config.projectEdgeMaxCount) {
     errors.push({
       path: 'totalEdges',
-      message: `Project全体の合計エッジ数 (${totalEdges}) が上限10000を超えています`,
+      message: `Project全体の合計エッジ数 (${totalEdges}) が上限${config.projectEdgeMaxCount}を超えています`,
     });
   }
 

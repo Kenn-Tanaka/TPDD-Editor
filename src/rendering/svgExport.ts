@@ -1,6 +1,7 @@
 import { Diagram, LevelDefinition, NodeKind, NodeStatus } from '../domain/schema';
 import { calculateEdgePath } from './connectionPoints';
 import { wrapText } from './textWrap';
+import { getRuntimeConfig } from '../config/runtimeConfig';
 
 /**
  * XML 特殊文字エスケープ
@@ -219,6 +220,22 @@ export function downloadSvg(svgString: string, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+export function validatePngDimensions(width: number, height: number, scale: number): { width: number; height: number } {
+  const outputWidth = Math.ceil(width * scale);
+  const outputHeight = Math.ceil(height * scale);
+  const config = getRuntimeConfig();
+  if (!Number.isFinite(outputWidth) || !Number.isFinite(outputHeight) || outputWidth <= 0 || outputHeight <= 0) {
+    throw new Error('PNG出力寸法が不正です');
+  }
+  if (outputWidth > config.pngMaxSidePx || outputHeight > config.pngMaxSidePx) {
+    throw new Error(`PNG出力の辺 (${outputWidth}×${outputHeight}px) が上限${config.pngMaxSidePx}pxを超えています`);
+  }
+  if (outputWidth * outputHeight > config.pngMaxTotalPixels) {
+    throw new Error(`PNG出力の総画素数 (${(outputWidth * outputHeight).toLocaleString()}) が上限${config.pngMaxTotalPixels.toLocaleString()}を超えています`);
+  }
+  return { width: outputWidth, height: outputHeight };
+}
+
 /**
  * 現在図をPNGラスタ画像として生成・ダウンロード
  */
@@ -236,9 +253,11 @@ export async function downloadDiagramPng(
     const img = new window.Image();
     img.onload = () => {
       try {
+        // 巨大Canvasは確保自体がブラウザを不安定化させるため、createElementより先に検査する。
+        const dimensions = validatePngDimensions(img.width || 800, img.height || 600, scale);
         const canvas = document.createElement('canvas');
-        canvas.width = (img.width || 800) * scale;
-        canvas.height = (img.height || 600) * scale;
+        canvas.width = dimensions.width;
+        canvas.height = dimensions.height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           URL.revokeObjectURL(url);

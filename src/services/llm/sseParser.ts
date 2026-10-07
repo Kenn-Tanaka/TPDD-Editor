@@ -16,16 +16,25 @@ export interface SseDeltaChunk {
   rawJson?: unknown;
 }
 
+export class ResponseTooLargeError extends Error {
+  constructor(public readonly maximumBytes: number) {
+    super(`応答サイズが上限${maximumBytes.toLocaleString()}バイトを超えています。`);
+    this.name = 'ResponseTooLargeError';
+  }
+}
+
 /**
  * Parses an SSE stream from a ReadableStreamDefaultReader.
  * Yields content chunks as they arrive.
  */
 export async function* parseSseStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maximumBytes = Number.POSITIVE_INFINITY,
 ): AsyncGenerator<SseDeltaChunk, void, unknown> {
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
+  let receivedBytes = 0;
 
   try {
     while (true) {
@@ -38,6 +47,12 @@ export async function* parseSseStream(
         // Flush remaining buffer
         buffer += decoder.decode(new Uint8Array(), { stream: false });
         break;
+      }
+
+      receivedBytes += value.byteLength;
+      if (receivedBytes > maximumBytes) {
+        await reader.cancel();
+        throw new ResponseTooLargeError(maximumBytes);
       }
 
       buffer += decoder.decode(value, { stream: true });

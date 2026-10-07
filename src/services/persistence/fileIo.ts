@@ -1,5 +1,6 @@
-import { Project } from '../../domain/schema';
+import { Project, ProjectSchema } from '../../domain/schema';
 import { validateProject } from '../../domain/validation';
+import { getRuntimeConfig } from '../../config/runtimeConfig';
 
 /**
  * Windowsファイル名の禁止文字および予約語をサニタイズ
@@ -26,15 +27,37 @@ export function sanitizeFilename(name: string, fallback = 'tpdd-project'): strin
 /**
  * ProjectをJSONファイル (.tpdd.json) としてダウンロード保存
  */
-export function saveProjectToFile(project: Project): void {
-  // 保存前に整合性チェック
+export type PrepareProjectJsonResult =
+  | { success: true; json: string; byteLength: number }
+  | { success: false; errorMessage: string; validationErrors?: { path: string; message: string }[] };
+
+/** 検査する文字列とダウンロードする文字列を同一にする。 */
+export function prepareProjectJson(project: Project): PrepareProjectJsonResult {
   const validation = validateProject(project);
   if (!validation.valid) {
-    console.warn('保存対象のプロジェクトに整合性警告があります:', validation.errors);
+    return {
+      success: false,
+      errorMessage: 'プロジェクトのスキーマまたは整合性検証に失敗しました',
+      validationErrors: validation.errors,
+    };
   }
+  const json = JSON.stringify(project, null, 2);
+  const byteLength = new TextEncoder().encode(json).byteLength;
+  const maximum = getRuntimeConfig().maxProjectFileBytes;
+  if (byteLength > maximum) {
+    return {
+      success: false,
+      errorMessage: `出力JSONのUTF-8サイズ (${byteLength.toLocaleString()}バイト) が上限${maximum.toLocaleString()}バイトを超えています`,
+    };
+  }
+  return { success: true, json, byteLength };
+}
 
-  const jsonString = JSON.stringify(project, null, 2);
-  const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
+export function saveProjectToFile(project: Project): PrepareProjectJsonResult {
+  const prepared = prepareProjectJson(project);
+  if (!prepared.success) return prepared;
+
+  const blob = new Blob([prepared.json], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
 
   const filename = `${sanitizeFilename(project.title)}.tpdd.json`;
@@ -45,6 +68,7 @@ export function saveProjectToFile(project: Project): void {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return prepared;
 }
 
 export interface LoadProjectResult {
@@ -58,12 +82,11 @@ export interface LoadProjectResult {
  * ファイルからJSON文字列を読み込んでProjectとして検証・パース
  */
 export async function parseAndValidateProjectJson(file: File): Promise<LoadProjectResult> {
-  // サイズ上限チェック (10MiB)
-  const MAX_FILE_SIZE = 10 * 1024 * 1024;
-  if (file.size > MAX_FILE_SIZE) {
+  const maximum = getRuntimeConfig().maxProjectFileBytes;
+  if (file.size > maximum) {
     return {
       success: false,
-      errorMessage: `ファイルサイズ (${(file.size / 1024 / 1024).toFixed(1)}MB) が上限10MBを超えています`,
+      errorMessage: `ファイルサイズ (${file.size.toLocaleString()}バイト) が上限${maximum.toLocaleString()}バイトを超えています`,
     };
   }
 
@@ -86,18 +109,15 @@ export async function parseAndValidateProjectJson(file: File): Promise<LoadProje
       };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const obj = parsed as any;
-    const supportedFormat =
-      obj.format === 'tpdd-project' || obj.format === 'thought-expansion-project';
-    if (!supportedFormat || obj.schemaVersion !== 1) {
+    const schemaResult = ProjectSchema.safeParse(parsed);
+    if (!schemaResult.success) {
       return {
         success: false,
-        errorMessage: '対応するデータ形式ではありません（formatまたはschemaVersionが一致しません）',
+        errorMessage: 'データのスキーマ検証に失敗しました',
+        validationErrors: schemaResult.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
       };
     }
-
-    const validation = validateProject(obj as Project);
+    const validation = validateProject(schemaResult.data);
     if (!validation.valid) {
       return {
         success: false,
@@ -108,7 +128,7 @@ export async function parseAndValidateProjectJson(file: File): Promise<LoadProje
 
     return {
       success: true,
-      project: obj as Project,
+      project: schemaResult.data,
     };
   } catch (err) {
     return {

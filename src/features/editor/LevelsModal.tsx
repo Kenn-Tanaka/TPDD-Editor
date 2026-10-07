@@ -8,32 +8,59 @@ import { gatewayClient } from '../../services/llm/gatewayClient';
 import { buildLevelDefinitionMessages } from '../../services/llm/levelDefinitionPrompt';
 import { extractAndParseAiJson, validateLevelDefinitionProposal } from '../../services/llm/aiSchemas';
 import { loadAppSettings } from '../../services/persistence/appStorage';
+import { countCharacters, getRuntimeConfig } from '../../config/runtimeConfig';
 
 interface LevelsModalProps { isOpen: boolean; onClose: () => void; }
-const splitItems = (text: string) => [...new Set(text.split(/\r?\n/).map((item) => item.trim().slice(0, 300)).filter(Boolean))].slice(0, 10);
+const splitItems = (text: string) => [...new Set(text.split(/\r?\n/).map((item) => item.trim()).filter(Boolean))];
 const joinItems = (items?: string[]) => (items ?? []).join('\n');
 
 const LevelDetailsEditor: React.FC<{ level: LevelDefinition; onSave: (patch: Partial<LevelDefinition>) => void }> = ({ level, onSave }) => {
+  const config = getRuntimeConfig();
+  const [label, setLabel] = useState(level.label);
   const [description, setDescription] = useState(level.description ?? '');
   const [includes, setIncludes] = useState(joinItems(level.includes));
   const [excludes, setExcludes] = useState(joinItems(level.excludes));
-  useEffect(() => { setDescription(level.description ?? ''); setIncludes(joinItems(level.includes)); setExcludes(joinItems(level.excludes)); }, [level]);
-  const save = () => onSave({ description: description.trim() || undefined, includes: splitItems(includes), excludes: splitItems(excludes) });
-  return <details className="mt-2 text-xs">
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { setLabel(level.label); setDescription(level.description ?? ''); setIncludes(joinItems(level.includes)); setExcludes(joinItems(level.excludes)); setError(null); }, [level]);
+  const save = () => {
+    const includedItems = splitItems(includes);
+    const excludedItems = splitItems(excludes);
+    const issues: string[] = [];
+    if (!label.trim()) issues.push('列名は空にできません');
+    if (countCharacters(label) > config.nameMaxChars) issues.push(`列名は${config.nameMaxChars}文字以内です`);
+    if (countCharacters(description) > config.descriptionMaxChars) issues.push(`説明は${config.descriptionMaxChars}文字以内です`);
+    if (includedItems.length > config.placementCriterionMaxCount || excludedItems.length > config.placementCriterionMaxCount) issues.push(`配置基準は各${config.placementCriterionMaxCount}件以内です`);
+    if ([...includedItems, ...excludedItems].some((item) => countCharacters(item) > config.placementCriterionMaxChars)) issues.push(`配置基準の各項目は${config.placementCriterionMaxChars}文字以内です`);
+    const includedSet = new Set(includedItems.map((item) => item.toLocaleLowerCase()));
+    const contradiction = excludedItems.find((item) => includedSet.has(item.toLocaleLowerCase()));
+    if (contradiction) issues.push(`「${contradiction}」を含める内容と含めない内容の両方には指定できません`);
+    if (issues.length > 0) { setError(issues.join(' / ')); return; }
+    setError(null);
+    onSave({ label: label.trim(), description: description.trim() || undefined, includes: includedItems, excludes: excludedItems });
+  };
+  return <div className="text-xs">
+    <div className="flex items-center gap-2">
+      <input value={label} onChange={(e) => setLabel(e.target.value)} className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded bg-white" />
+      <button onClick={save} className="px-2 py-1 border border-blue-300 text-blue-700 rounded bg-white">変更を確定</button>
+    </div>
+    {error && <p className="mt-1 text-red-600">{error}</p>}
+    <details className="mt-2">
     <summary className="cursor-pointer text-slate-500">説明・配置基準</summary>
     <div className="mt-2 grid gap-2">
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} onBlur={save} maxLength={1000} rows={2} placeholder="列の意味や配置基準" className="w-full p-2 border border-slate-300 rounded" />
+      <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="列の意味や配置基準" className="w-full p-2 border border-slate-300 rounded" />
       <div className="grid grid-cols-2 gap-2">
-        <textarea value={includes} onChange={(e) => setIncludes(e.target.value)} onBlur={save} rows={3} placeholder="含める内容（1行1項目）" className="w-full p-2 border border-slate-300 rounded" />
-        <textarea value={excludes} onChange={(e) => setExcludes(e.target.value)} onBlur={save} rows={3} placeholder="含めない内容（1行1項目）" className="w-full p-2 border border-slate-300 rounded" />
+        <textarea value={includes} onChange={(e) => setIncludes(e.target.value)} rows={3} placeholder="含める内容（1行1項目）" className="w-full p-2 border border-slate-300 rounded" />
+        <textarea value={excludes} onChange={(e) => setExcludes(e.target.value)} rows={3} placeholder="含めない内容（1行1項目）" className="w-full p-2 border border-slate-300 rounded" />
       </div>
     </div>
-  </details>;
+    </details>
+  </div>;
 };
 
 export const LevelsModal: React.FC<LevelsModalProps> = ({ isOpen, onClose }) => {
   const { state, dispatch } = useApp();
   const project = state.history.present;
+  const config = getRuntimeConfig();
   const { levels } = project;
   const { activeExecution, runExclusive, cancel } = useAiExecution();
   const [newLevelName, setNewLevelName] = useState('');
@@ -68,13 +95,17 @@ export const LevelsModal: React.FC<LevelsModalProps> = ({ isOpen, onClose }) => 
 
   const handleAdd = () => {
     const label = newLevelName.trim();
-    if (!label || levels.length >= 12) return;
+    if (!label || levels.length >= config.levelMaxCount) return;
     if (levels.some((level) => level.label.trim().toLocaleLowerCase() === label.toLocaleLowerCase())) { setProposalError('同じ名前の列が既に存在します。'); return; }
     const includedItems = splitItems(includes);
     const excludedItems = splitItems(excludes);
     const includedSet = new Set(includedItems.map((item) => item.toLocaleLowerCase()));
     const contradiction = excludedItems.find((item) => includedSet.has(item.toLocaleLowerCase()));
     if (contradiction) { setProposalError(`「${contradiction}」が含める内容と含めない内容の両方にあります。`); return; }
+    if (countCharacters(label) > config.nameMaxChars) { setProposalError(`列名は${config.nameMaxChars}文字以内です。`); return; }
+    if (countCharacters(description) > config.descriptionMaxChars) { setProposalError(`説明は${config.descriptionMaxChars}文字以内です。`); return; }
+    if (includedItems.length > config.placementCriterionMaxCount || excludedItems.length > config.placementCriterionMaxCount) { setProposalError(`配置基準は各${config.placementCriterionMaxCount}件以内です。`); return; }
+    if ([...includedItems, ...excludedItems].some((item) => countCharacters(item) > config.placementCriterionMaxChars)) { setProposalError(`配置基準の各項目は${config.placementCriterionMaxChars}文字以内です。`); return; }
     dispatch({ type: 'ADD_LEVEL', params: { label, description, includes: includedItems, excludes: excludedItems } });
     setNewLevelName(''); setDescription(''); setIncludes(''); setExcludes(''); setAssumptions([]); setProposalError(null);
   };
@@ -111,9 +142,9 @@ export const LevelsModal: React.FC<LevelsModalProps> = ({ isOpen, onClose }) => 
   const move = (index: number, delta: -1 | 1) => {
     const otherIndex = index + delta;
     if (otherIndex < 0 || otherIndex >= sortedLevels.length) return;
-    const current = sortedLevels[index], other = sortedLevels[otherIndex];
-    dispatch({ type: 'UPDATE_LEVEL', levelId: current.id, patch: { order: other.order } });
-    dispatch({ type: 'UPDATE_LEVEL', levelId: other.id, patch: { order: current.order } });
+    const orderedLevelIds = sortedLevels.map((level) => level.id);
+    [orderedLevelIds[index], orderedLevelIds[otherIndex]] = [orderedLevelIds[otherIndex], orderedLevelIds[index]];
+    dispatch({ type: 'REORDER_LEVELS', orderedLevelIds });
   };
   const startDelete = (levelId: string) => { if (levels.length <= 1) return; setDeletingLevelId(levelId); setTargetLevelId(levels.find((level) => level.id !== levelId)?.id ?? ''); };
   const confirmDelete = () => { if (!deletingLevelId || !targetLevelId) return; dispatch({ type: 'REMOVE_LEVEL', levelIdToRemove: deletingLevelId, targetLevelId }); setDeletingLevelId(null); };
@@ -131,24 +162,23 @@ export const LevelsModal: React.FC<LevelsModalProps> = ({ isOpen, onClose }) => 
             {sortedLevels.map((level, index) => <div key={level.id} className="p-2 bg-slate-50 border border-slate-200 rounded-lg">
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-mono text-slate-400 w-5 text-center">{index + 1}</span>
-                <input value={level.label} onChange={(e) => dispatch({ type: 'UPDATE_LEVEL', levelId: level.id, patch: { label: e.target.value } })} className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded bg-white" />
+                <div className="flex-1"><LevelDetailsEditor level={level} onSave={(patch) => dispatch({ type: 'UPDATE_LEVEL', levelId: level.id, patch })} /></div>
                 <button disabled={index === 0} onClick={() => move(index, -1)} className="p-1 text-slate-500 disabled:text-slate-300" title="上へ移動"><ArrowUp className="w-3.5 h-3.5" /></button>
                 <button disabled={index === sortedLevels.length - 1} onClick={() => move(index, 1)} className="p-1 text-slate-500 disabled:text-slate-300" title="下へ移動"><ArrowDown className="w-3.5 h-3.5" /></button>
                 <button disabled={levels.length <= 1} onClick={() => startDelete(level.id)} className="p-1 text-slate-400 hover:text-red-600 disabled:text-slate-200" title="列を削除"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
-              <LevelDetailsEditor level={level} onSave={(patch) => dispatch({ type: 'UPDATE_LEVEL', levelId: level.id, patch })} />
             </div>)}
           </div>
-          {levels.length < 12 && <section className="pt-3 border-t border-slate-200 space-y-3">
+          {levels.length < config.levelMaxCount && <section className="pt-3 border-t border-slate-200 space-y-3">
             <h3 className="text-xs font-bold text-slate-700">新しい列</h3>
-            <input value={newLevelName} onChange={(e) => setNewLevelName(e.target.value)} maxLength={200} placeholder="新規列名（例: 運用、施策など）" className="w-full px-2.5 py-2 text-xs border border-slate-300 rounded" />
+            <input value={newLevelName} onChange={(e) => setNewLevelName(e.target.value)} placeholder="新規列名（例: 運用、施策など）" className="w-full px-2.5 py-2 text-xs border border-slate-300 rounded" />
             <div className="flex items-center gap-2">
               {isDefining ? <button onClick={() => cancel(activeExecution?.executionId)} className="px-3 py-1.5 bg-red-50 border border-red-200 text-red-700 rounded text-xs flex items-center gap-1"><Square className="w-3 h-3" />取消</button>
                 : <button onClick={handleSuggest} disabled={aiBusy || !newLevelName.trim()} className="px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded text-xs flex items-center gap-1 disabled:opacity-50"><Sparkles className="w-3.5 h-3.5" />AIで配置基準を提案</button>}
               {activeExecution && !isDefining && <span className="text-[11px] text-amber-700">{activeExecution.label}を実行中です。</span>}
             </div>
             {proposalError && <p className="text-xs text-red-600">{proposalError}</p>}
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={1000} rows={3} placeholder="説明文：この列が表す概念や配置基準" className="w-full p-2 text-xs border border-slate-300 rounded" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="説明文：この列が表す概念や配置基準" className="w-full p-2 text-xs border border-slate-300 rounded" />
             <div className="grid grid-cols-2 gap-3">
               <textarea value={includes} onChange={(e) => setIncludes(e.target.value)} rows={4} placeholder="含める内容（1行1項目、最大10件）" className="w-full p-2 text-xs border border-slate-300 rounded" />
               <textarea value={excludes} onChange={(e) => setExcludes(e.target.value)} rows={4} placeholder="含めない内容（1行1項目、最大10件）" className="w-full p-2 text-xs border border-slate-300 rounded" />

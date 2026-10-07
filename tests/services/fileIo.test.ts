@@ -5,18 +5,21 @@ import { validateProject } from '../../src/domain/validation';
 import { parseAndValidateProjectJson } from '../../src/services/persistence/fileIo';
 
 describe('Project JSON Roundtrip & Error Resilience (P01, P02)', () => {
-  it.each(['tpdd-project', 'thought-expansion-project'] as const)(
-    'P01: %s 形式のプロジェクトファイルを読み込める',
-    async (format) => {
-      const project = { ...createNewProject('読込検証'), format };
+  it.each([
+    ['tpdd-project', true],
+    ['thought-expansion-project', false],
+  ] as const)(
+    'P01: %s 形式の受理可否を新仕様どおり判定する',
+    async (format, expected) => {
+      const project = { ...createNewProject('読込検証'), format } as unknown as Project;
       const file = new File([JSON.stringify(project)], 'project.tpdd.json', {
         type: 'application/json',
       });
 
       const result = await parseAndValidateProjectJson(file);
 
-      expect(result.success).toBe(true);
-      expect(result.project?.format).toBe(format);
+      expect(result.success).toBe(expected);
+      if (expected) expect(result.project?.format).toBe(format);
     }
   );
 

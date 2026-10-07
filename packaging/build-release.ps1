@@ -25,6 +25,7 @@ $releaseDir = Join-Path $projectRoot "release"
 $gatewaySrcDir = Join-Path $projectRoot "tools\llm-gateway"
 $launcherSource = Join-Path $projectRoot "tools\launcher\src\main.cpp"
 $launcherExe = Join-Path $env:TEMP ("TPDD-Launcher-" + [System.Guid]::NewGuid().ToString("N") + ".exe")
+$defaults = Get-Content -Raw (Join-Path $projectRoot "config\defaults.json") | ConvertFrom-Json
 $stagingDir = Join-Path $env:TEMP ("tpdd-staging-" + [System.Guid]::NewGuid().ToString().Substring(0, 8))
 $tempMingwDir = Join-Path $env:TEMP "tpdd-mingw-temp"
 $isTempMingw = $false
@@ -105,6 +106,9 @@ try {
     Write-Host "`n[3/7] Compiling TPDD one-click launcher..." -ForegroundColor Yellow
     & $gxxCmd.Source `
         -std=c++20 -O2 -DNDEBUG -Wall -Wextra -municode `
+        "-DTPDD_DEFAULT_GATEWAY_PORT=$($defaults.gatewayPort)" `
+        "-DTPDD_DEFAULT_EDITOR_PORT=$($defaults.editorPort)" `
+        "-DTPDD_DEFAULT_LAUNCHER_TIMEOUT_MS=$($defaults.launcherStartupTimeoutMs)" `
         -static -static-libgcc -static-libstdc++ `
         $launcherSource -o $launcherExe `
         -lws2_32 -lshell32 -luser32
@@ -207,6 +211,7 @@ try {
     Copy-Item -Force "$projectRoot\docs\QUICKSTART.md" "$stagingDir\docs\"
     Copy-Item -Force "$projectRoot\docs\REFERENCE_MANUAL.md" "$stagingDir\docs\"
     Copy-Item -Force "$projectRoot\docs\SPECIFICATION.md" "$stagingDir\docs\"
+    Copy-Item -Force "$projectRoot\docs\CONFIGURATION.md" "$stagingDir\docs\"
     Copy-Item -Force "$projectRoot\AGENTS.md" "$stagingDir\docs\"
     
     Copy-Item -Force "$scriptDir\templates\start-all.bat" "$stagingDir\"

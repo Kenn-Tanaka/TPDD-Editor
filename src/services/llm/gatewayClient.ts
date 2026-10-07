@@ -1,5 +1,10 @@
 import { LlmCallOptions, LlmConnection, LlmModelOption, LlmService, LlmTextResult } from './types';
-import { parseSseStream } from './sseParser';
+import { parseSseStream, ResponseTooLargeError } from './sseParser';
+import { getRuntimeConfig } from '../../config/runtimeConfig';
+import { isValidLoopbackUrl } from '../persistence/appStorage';
+
+// エラー本文は画面表示の診断用途だけなので、固定の安全上限でメモリ消費を抑える。
+const ERROR_RESPONSE_MAX_BYTES = 64 * 1024;
 
 export class GatewayError extends Error {
   constructor(
@@ -22,6 +27,9 @@ export const gatewayClient: LlmService = {
    * GET /v1/models による利用可能モデル一覧取得
    */
   async listModels(connection: LlmConnection, externalSignal?: AbortSignal): Promise<LlmModelOption[]> {
+    const config = getRuntimeConfig();
+    assertGatewayUrl(connection.apiBaseUrl);
+    if (externalSignal?.aborted) throw new GatewayError('モデル一覧取得は開始前にキャンセルされました。', 408);
     const base = connection.apiBaseUrl.replace(/\/+$/, '');
     const url = `${base}/models`;
 
@@ -35,14 +43,14 @@ export const gatewayClient: LlmService = {
       headers.Authorization = `Bearer ${connection.token.trim()}`;
     }
 
-    // 30秒タイムアウト
-    const timeoutMs = 30000;
+    const timeoutMs = config.modelListTimeoutMs;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const onExternalAbort = () => controller.abort();
     if (externalSignal) {
       externalSignal.addEventListener('abort', onExternalAbort);
+      if (externalSignal.aborted) controller.abort();
     }
 
     try {
@@ -53,14 +61,10 @@ export const gatewayClient: LlmService = {
       });
 
       if (!response.ok) {
-        await handleHttpError(response);
+        await handleHttpError(response, controller.signal);
       }
 
-      // レスポンスサイズ上限 (2MiB)
-      const text = await response.text();
-      if (text.length > 2 * 1024 * 1024) {
-        throw new GatewayError('モデル一覧の応答サイズが2MBの上限を超えています。');
-      }
+      const text = await readResponseTextLimited(response, config.maxModelListResponseBytes, controller.signal);
 
       let parsed: unknown;
       try {
@@ -91,9 +95,10 @@ export const gatewayClient: LlmService = {
       return result;
     } catch (err: unknown) {
       if (err instanceof GatewayError) throw err;
+      if (err instanceof ResponseTooLargeError) throw new GatewayError(`モデル一覧の${err.message}`);
 
       if (err instanceof DOMException && err.name === 'AbortError') {
-        throw new GatewayError('モデル一覧取得がタイムアウト（30秒）またはキャンセルされました。', 408);
+        throw new GatewayError(`モデル一覧取得がタイムアウト（${timeoutMs}ms）またはキャンセルされました。`, 408);
       }
 
       // ネットワーク・CORS・Gateway停止エラー
@@ -117,6 +122,9 @@ export const gatewayClient: LlmService = {
     options: LlmCallOptions,
     _onTextChunk?: (chunk: string) => void
   ): Promise<LlmTextResult> {
+    const config = getRuntimeConfig();
+    assertGatewayUrl(connection.apiBaseUrl);
+    if (options.signal?.aborted) throw new GatewayError('推論は開始前にキャンセルされました。', 408);
     const base = connection.apiBaseUrl.replace(/\/+$/, '');
     const url = `${base}/chat/completions`;
 
@@ -135,13 +143,15 @@ export const gatewayClient: LlmService = {
     }
 
     // タイムアウト
-    const timeoutMs = (options.timeoutSeconds || 600) * 1000;
+    const timeoutMs = options.timeoutMs ?? (options.timeoutSeconds !== undefined ? options.timeoutSeconds * 1000 : config.aiTaskTimeoutMs);
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new GatewayError('推論の残り時間がありません。', 408);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const onExternalAbort = () => controller.abort();
     if (options.signal) {
       options.signal.addEventListener('abort', onExternalAbort);
+      if (options.signal.aborted) controller.abort();
     }
 
     const body: Record<string, unknown> = {
@@ -162,7 +172,7 @@ export const gatewayClient: LlmService = {
       });
 
       if (!response.ok) {
-        await handleHttpError(response);
+        await handleHttpError(response, controller.signal);
       }
 
       if (isStream) {
@@ -174,7 +184,7 @@ export const gatewayClient: LlmService = {
         let accumulatedContent = '';
         let lastFinishReason: string | null = null;
 
-        const sseStream = parseSseStream(reader, controller.signal);
+        const sseStream = parseSseStream(reader, controller.signal, config.maxLlmResponseBytes);
         for await (const chunk of sseStream) {
           if (chunk.content) {
             accumulatedContent += chunk.content;
@@ -208,7 +218,7 @@ export const gatewayClient: LlmService = {
       }
 
       // 非ストリーミング応答処理
-      const text = await response.text();
+      const text = await readResponseTextLimited(response, config.maxLlmResponseBytes, controller.signal);
       let parsed: unknown;
       try {
         parsed = JSON.parse(text);
@@ -246,9 +256,10 @@ export const gatewayClient: LlmService = {
       };
     } catch (err: unknown) {
       if (err instanceof GatewayError) throw err;
+      if (err instanceof ResponseTooLargeError) throw new GatewayError(`LLMの${err.message}`);
 
       if (err instanceof DOMException && err.name === 'AbortError') {
-        throw new GatewayError(`推論がタイムアウト（${options.timeoutSeconds}秒）またはユーザーにより中止されました。`, 408);
+        throw new GatewayError(`推論がタイムアウト（${Math.ceil(timeoutMs)}ms）またはユーザーにより中止されました。`, 408);
       }
 
       throw new GatewayError(
@@ -267,15 +278,13 @@ export const gatewayClient: LlmService = {
 /**
  * 仕様書 8.6節: HTTPステータス・エラー詳細の丁寧な解析
  */
-async function handleHttpError(response: Response): Promise<never> {
+async function handleHttpError(response: Response, signal?: AbortSignal): Promise<never> {
   let errorType: string | undefined;
   let detailMessage: string | undefined;
 
   try {
-    const errorText = await response.text();
-    // 64KiBに制限
-    const truncated = errorText.slice(0, 65536);
-    const parsed = JSON.parse(truncated);
+    const errorText = await readResponseTextLimited(response, ERROR_RESPONSE_MAX_BYTES, signal);
+    const parsed = JSON.parse(errorText);
     if (parsed && typeof parsed === 'object') {
       // Gateway標準 error オブジェクト
       const errObj = (parsed as { error?: { message?: string; type?: string } }).error;
@@ -284,7 +293,8 @@ async function handleHttpError(response: Response): Promise<never> {
         detailMessage = errObj.message;
       }
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof ResponseTooLargeError || (error instanceof DOMException && error.name === 'AbortError')) throw error;
     // text/plain等の場合
   }
 
@@ -325,4 +335,50 @@ async function handleHttpError(response: Response): Promise<never> {
   }
 
   throw new GatewayError(msg, status, errorType, detailMessage);
+}
+
+function assertGatewayUrl(value: string): void {
+  const validation = isValidLoopbackUrl(value);
+  if (!validation.valid) throw new GatewayError(`Gateway URLが不正です: ${validation.message}`, 0);
+}
+
+/** bodyを受信しながらUTF-8バイト上限を検査し、超過時は直ちにreaderを取消す。 */
+export async function readResponseTextLimited(
+  response: Response,
+  maximumBytes: number,
+  signal?: AbortSignal,
+): Promise<string> {
+  const contentLength = response.headers.get('content-length');
+  if (contentLength !== null) {
+    const declared = Number(contentLength);
+    if (Number.isFinite(declared) && declared > maximumBytes) {
+      await response.body?.cancel();
+      throw new ResponseTooLargeError(maximumBytes);
+    }
+  }
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let result = '';
+  let received = 0;
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        await reader.cancel();
+        throw new DOMException('The operation was aborted.', 'AbortError');
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > maximumBytes) {
+        await reader.cancel();
+        throw new ResponseTooLargeError(maximumBytes);
+      }
+      result += decoder.decode(value, { stream: true });
+    }
+    result += decoder.decode();
+    return result;
+  } finally {
+    try { reader.releaseLock(); } catch { /* reader取消済み */ }
+  }
 }

@@ -1,4 +1,5 @@
 import { generateId } from '../shared/id';
+import { getRuntimeConfig } from '../config/runtimeConfig';
 import {
   EdgeKind,
   LevelDefinition,
@@ -25,7 +26,7 @@ export interface AddLevelParams {
 
 function normalizeLevelItems(items?: string[]): string[] | undefined {
   if (!items) return undefined;
-  const normalized = [...new Set(items.map((item) => item.trim().slice(0, 300)).filter(Boolean))].slice(0, 10);
+  const normalized = [...new Set(items.map((item) => item.trim()).filter(Boolean))];
   return normalized.length > 0 ? normalized : undefined;
 }
 
@@ -58,7 +59,7 @@ export function createNewProject(title = '新規思考展開図'): Project {
     ],
     aiPreferences: {
       modelId: DEFAULT_MODEL_ID,
-      timeoutSeconds: 600,
+      timeoutSeconds: getRuntimeConfig().aiTaskTimeoutMs / 1000,
       temperature: 0.2,
       stream: false,
     },
@@ -556,8 +557,9 @@ export function updateProjectMeta(
  * 抽象度列の追加 (1〜12列)
  */
 export function addLevel(project: Project, params: AddLevelParams): Project {
-  if (project.levels.length >= 12) {
-    throw new Error('抽象度列は最大12列までです');
+  const maximum = getRuntimeConfig().levelMaxCount;
+  if (project.levels.length >= maximum) {
+    throw new Error(`抽象度列は最大${maximum}列までです`);
   }
 
   const maxOrder = project.levels.reduce((max, l) => Math.max(max, l.order), -1);
@@ -585,10 +587,31 @@ export function updateLevel(
   levelId: string,
   patch: Partial<Pick<LevelDefinition, 'label' | 'description' | 'includes' | 'excludes' | 'order'>>
 ): Project {
+  const current = project.levels.find((level) => level.id === levelId);
+  if (!current) return project;
+  const next = { ...current, ...patch };
+  if (JSON.stringify(current) === JSON.stringify(next)) return project;
   return {
     ...project,
     updatedAt: new Date().toISOString(),
     levels: project.levels.map((l) => (l.id === levelId ? { ...l, ...patch } : l)),
+  };
+}
+
+/** 列順を一つの不可分な確定操作として再設定する。 */
+export function reorderLevels(project: Project, orderedLevelIds: string[]): Project {
+  if (orderedLevelIds.length !== project.levels.length
+    || new Set(orderedLevelIds).size !== project.levels.length
+    || orderedLevelIds.some((id) => !project.levels.some((level) => level.id === id))) {
+    throw new Error('列順には現在の全列IDを重複なく指定してください');
+  }
+  const currentIds = [...project.levels].sort((a, b) => a.order - b.order).map((level) => level.id);
+  if (currentIds.every((id, index) => id === orderedLevelIds[index])) return project;
+  const orderById = new Map(orderedLevelIds.map((id, index) => [id, index]));
+  return {
+    ...project,
+    updatedAt: new Date().toISOString(),
+    levels: project.levels.map((level) => ({ ...level, order: orderById.get(level.id)! })),
   };
 }
 

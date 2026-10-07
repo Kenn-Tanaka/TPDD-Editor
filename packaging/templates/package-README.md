@@ -26,7 +26,7 @@ TPDD_v<バージョン>/
 │
 ├── samples/                    # サンプル思考展開図データ
 │   ├── sample-project.tpdd.json     # 現行形式のサンプル
-│   └── sample-project.thought.json  # 旧形式の互換確認用サンプル
+│   └── sample-project.thought.json  # 別拡張子でも現行スキーマを使うサンプル
 │
 └── docs/                       # 仕様・設計・マニュアル資料
     ├── QUICKSTART.md           ★ 10分でわかるクイックスタートガイド

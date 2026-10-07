@@ -4,6 +4,7 @@ import { Settings, X, Check, Activity, AlertCircle, ShieldCheck } from 'lucide-r
 import { useApp } from '../../app/AppContext';
 import { gatewayClient } from '../../services/llm/gatewayClient';
 import { isValidLoopbackUrl, loadAppSettings, saveAppSettings } from '../../services/persistence/appStorage';
+import { getRuntimeConfig } from '../../config/runtimeConfig';
 
 interface GatewayConfigModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export const GatewayConfigModal: React.FC<GatewayConfigModalProps> = ({ isOpen, 
   const { state, dispatch } = useApp();
   const { aiPreferences } = state.history.present;
   const initialSettings = loadAppSettings();
+  const config = getRuntimeConfig();
 
   const [urlInput, setUrlInput] = useState(initialSettings.gatewayUrl);
   const [authEnabled, setAuthEnabled] = useState(initialSettings.gatewayAuthEnabled);
@@ -34,6 +36,12 @@ export const GatewayConfigModal: React.FC<GatewayConfigModalProps> = ({ isOpen, 
     if (!urlValidation.valid) {
       setTestStatus('error');
       setTestMessage(urlValidation.message || 'URLが不正です');
+      return;
+    }
+    if (!Number.isInteger(timeoutSec)
+      || timeoutSec * 1000 < config.aiTaskTimeoutMinMs
+      || timeoutSec * 1000 > config.aiTaskTimeoutMaxMs) {
+      alert(`タイムアウトは${config.aiTaskTimeoutMinMs / 1000}〜${config.aiTaskTimeoutMaxMs / 1000}秒の整数で指定してください`);
       return;
     }
 
@@ -64,6 +72,12 @@ export const GatewayConfigModal: React.FC<GatewayConfigModalProps> = ({ isOpen, 
       alert(urlValidation.message || 'Gateway URLが不正です');
       return;
     }
+    if (!Number.isInteger(timeoutSec)
+      || timeoutSec * 1000 < config.aiTaskTimeoutMinMs
+      || timeoutSec * 1000 > config.aiTaskTimeoutMaxMs) {
+      alert(`タイムアウトは${config.aiTaskTimeoutMinMs / 1000}〜${config.aiTaskTimeoutMaxMs / 1000}秒の整数で指定してください`);
+      return;
+    }
 
     // 非秘密設定をLocalStorageへ保存
     saveAppSettings({
@@ -75,19 +89,9 @@ export const GatewayConfigModal: React.FC<GatewayConfigModalProps> = ({ isOpen, 
     dispatch({ type: 'SET_GATEWAY_TOKEN', token: tokenInput.trim() });
 
     // ProjectのaiPreferencesを更新
-    const currentProj = state.history.present;
     dispatch({
-      type: 'LOAD_PROJECT',
-      project: {
-        ...currentProj,
-        updatedAt: new Date().toISOString(),
-        aiPreferences: {
-          ...currentProj.aiPreferences,
-          timeoutSeconds: timeoutSec,
-          temperature,
-          stream,
-        },
-      },
+      type: 'UPDATE_AI_PREFERENCES',
+      patch: { timeoutSeconds: timeoutSec, temperature, stream },
     });
 
     onClose();
@@ -158,12 +162,12 @@ export const GatewayConfigModal: React.FC<GatewayConfigModalProps> = ({ isOpen, 
           <div className="grid grid-cols-2 gap-3 pt-1">
             <div>
               <label className="text-slate-600 block mb-1 font-medium">
-                タイムアウト（秒: 30〜1800）
+                タイムアウト（秒: {config.aiTaskTimeoutMinMs / 1000}〜{config.aiTaskTimeoutMaxMs / 1000}）
               </label>
               <input
                 type="number"
-                min={30}
-                max={1800}
+                min={config.aiTaskTimeoutMinMs / 1000}
+                max={config.aiTaskTimeoutMaxMs / 1000}
                 value={timeoutSec}
                 onChange={(e) => setTimeoutSec(Number(e.target.value))}
                 className="w-full p-1.5 border border-slate-300 rounded"

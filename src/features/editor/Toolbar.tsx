@@ -76,13 +76,15 @@ export const Toolbar: React.FC = () => {
 
   // 保存 (.tpdd.json)
   const handleSaveJson = () => {
-    saveProjectToFile(project);
+    const result = saveProjectToFile(project);
     dispatch({
       type: 'SET_NOTIFICATION',
       notification: {
         id: `save-ok-${Date.now()}`,
-        type: 'success',
-        message: `プロジェクト「${project.title}」をダウンロード保存しました。`,
+        type: result.success ? 'success' : 'error',
+        message: result.success
+          ? `プロジェクト「${project.title}」をダウンロード保存しました。`
+          : `保存失敗: ${result.errorMessage}`,
       },
     });
   };

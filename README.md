@@ -2,7 +2,7 @@
 
 要求、機能、機構、構造、制約、メモをノードとして配置し、ノード間の関係と詳細化の階層を編集するフロントエンド完結型の「思考展開図エディタ」（英語名: Thinking Process Development Diagram Editor、短縮名: TPDD Editor）です。
 
-作成したプロジェクトをJSON（`.tpdd.json`、旧 `.thought.json` 互換）で保存し、現在の図を外部アプリケーション（Word、PowerPoint等）でも崩れず貼り付け可能な標準SVGとして出力できます。
+作成したプロジェクトをJSON（`.tpdd.json`、`.thought.json` 拡張子でも現行スキーマのみ受理）で保存し、現在の図を外部アプリケーション（Word、PowerPoint等）でも崩れず貼り付け可能な標準SVGとして出力できます。
 また、ローカルのLightweight LLM Gateway経由でLLMと連携し、選択したノードの展開案・代替案の生成や図全体のレビュー支援を行います。LLMの出力は候補として提示され、ユーザーが明示的に選択採用した内容のみが同じ検証・履歴処理を通して図へ反映されます。
 
 ---
@@ -32,7 +32,8 @@
 ## 2. マニュアル・利用ガイド
 
 - [**クイックスタートガイド (docs/QUICKSTART.md)**](file:///c:/Users/kenta/Documents/Antigravity_Projects/TPDD-Editor/docs/QUICKSTART.md): 10分で基本操作からAI展開、保存・SVG出力までを体験できるステップバイステップ手引き
-- [**リファレンスマニュアル (docs/REFERENCE_MANUAL.md)**](file:///c:/Users/kenta/Documents/Antigravity_Projects/TPDD-Editor/docs/REFERENCE_MANUAL.md): 全機能の詳細仕様、データモデル、UI操作、ショートカット、設定項目、FAQの完全解説書
+- [**リファレンスマニュアル (docs/REFERENCE_MANUAL.md)**](docs/REFERENCE_MANUAL.md): 全機能の詳細仕様、データモデル、UI操作、ショートカット、設定項目、FAQの完全解説書
+- [**運用設定 (docs/CONFIGURATION.md)**](docs/CONFIGURATION.md): 配布後に変更できるJSON設定、上限、優先順位、反映方法
 - [**先行文献との差異分析書 (docs/DIFFERENCE_ANALYSIS.md)**](file:///c:/Users/kenta/Documents/Antigravity_Projects/TPDD-Editor/docs/DIFFERENCE_ANALYSIS.md): 畑村・中尾・間瀬らによる「機械設計支援システム(2002)」との設計思想の継承点および現代的進化・差異の比較報告書
 
 ---

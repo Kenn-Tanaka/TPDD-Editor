@@ -1,4 +1,5 @@
 import { Project } from '../../domain/schema';
+import { getRuntimeConfig } from '../../config/runtimeConfig';
 import { validateProject } from '../../domain/validation';
 
 export interface AutoSaveSnapshot {
@@ -12,7 +13,6 @@ export interface AutoSaveSnapshot {
 const DB_NAME = 'TPDDEditorDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'autosave_snapshots';
-const MAX_SNAPSHOTS = 10;
 
 /**
  * IndexedDB オープンヘルパー
@@ -65,12 +65,13 @@ export async function saveAutoSaveSnapshot(
 
   // 10件超過時の古いスナップショット削除
   const allSnapshots = await getAllAutoSaveSnapshots();
-  if (allSnapshots.length > MAX_SNAPSHOTS) {
+  const maximum = getRuntimeConfig().autosaveSnapshotMaxCount;
+  if (allSnapshots.length > maximum) {
     // 日時が古い順にソートして超過分を削除
     allSnapshots.sort(
       (a, b) => new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime()
     );
-    const toDeleteCount = allSnapshots.length - MAX_SNAPSHOTS;
+    const toDeleteCount = allSnapshots.length - maximum;
     const deleteTx = db.transaction(STORE_NAME, 'readwrite');
     const deleteCompleted = waitForTransaction(deleteTx);
     const delStore = deleteTx.objectStore(STORE_NAME);

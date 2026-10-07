@@ -5,9 +5,7 @@ export interface AppSettings {
 }
 
 const STORAGE_KEY = 'tpdd_editor_settings';
-const LEGACY_STORAGE_KEY = 'thought_expansion_settings';
-
-export const DEFAULT_GATEWAY_URL = 'http://127.0.0.1:8765/v1';
+export const DEFAULT_GATEWAY_URL = getRuntimeConfig().defaultGatewayUrl;
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   gatewayUrl: DEFAULT_GATEWAY_URL,
@@ -20,6 +18,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
  * localhost, 127.0.0.1, [::1] のhttp URLのみ許可し、userinfo, query, fragmentを拒否
  */
 export function isValidLoopbackUrl(urlStr: string): { valid: boolean; message?: string } {
+  if (isLoopbackGatewayUrl(urlStr)) return { valid: true };
   try {
     const url = new URL(urlStr);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
@@ -60,17 +59,23 @@ export function loadAppSettings(): AppSettings {
     return { ...DEFAULT_APP_SETTINGS };
   }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULT_APP_SETTINGS };
 
-    const parsed = JSON.parse(raw);
-    return {
-      gatewayUrl: typeof parsed.gatewayUrl === 'string' ? parsed.gatewayUrl : DEFAULT_GATEWAY_URL,
-      gatewayAuthEnabled: Boolean(parsed.gatewayAuthEnabled),
-      favoriteModelIds: Array.isArray(parsed.favoriteModelIds) ? parsed.favoriteModelIds : ['lmstudio/default'],
-    };
-  } catch {
-    return { ...DEFAULT_APP_SETTINGS };
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('保存済み設定はオブジェクトではありません');
+    const value = parsed as Record<string, unknown>;
+    const gatewayUrl = value.gatewayUrl;
+    if (typeof gatewayUrl !== 'string') throw new Error('gatewayUrl は文字列である必要があります');
+    const urlValidation = isValidLoopbackUrl(gatewayUrl);
+    if (!urlValidation.valid) throw new Error(`gatewayUrl: ${urlValidation.message}`);
+    if (typeof value.gatewayAuthEnabled !== 'boolean') throw new Error('gatewayAuthEnabled は真偽値である必要があります');
+    if (!Array.isArray(value.favoriteModelIds) || value.favoriteModelIds.some((id) => typeof id !== 'string' || id.length === 0)) {
+      throw new Error('favoriteModelIds は空でない文字列の配列である必要があります');
+    }
+    return { gatewayUrl, gatewayAuthEnabled: value.gatewayAuthEnabled, favoriteModelIds: value.favoriteModelIds as string[] };
+  } catch (error) {
+    throw new Error(`保存済み端末設定 (${STORAGE_KEY}) が不正です: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -90,3 +95,4 @@ export function saveAppSettings(settings: Partial<AppSettings>): void {
     console.warn('設定の保存に失敗しました:', e);
   }
 }
+import { getRuntimeConfig, isLoopbackGatewayUrl } from '../../config/runtimeConfig';

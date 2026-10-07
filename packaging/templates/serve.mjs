@@ -7,7 +7,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distDir = path.resolve(__dirname, 'dist');
 
-const PORT = 3000;
+const runtimeConfigPath = path.join(distDir, 'tpdd-config.json');
+if (!fs.existsSync(runtimeConfigPath)) {
+  throw new Error('dist/tpdd-config.json がありません。配布パッケージを修復してください。');
+}
+const runtimeConfig = JSON.parse(fs.readFileSync(runtimeConfigPath, 'utf8'));
+if (!Number.isInteger(runtimeConfig.editorPort) || runtimeConfig.editorPort < 1 || runtimeConfig.editorPort > 65535) {
+  throw new Error('tpdd-config.json の editorPort は1〜65535の整数である必要があります。');
+}
+const PORT = runtimeConfig.editorPort;
 const HOST = '127.0.0.1';
 
 const MIME_TYPES = {

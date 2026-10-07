@@ -388,10 +388,13 @@ describe('AI Output Validation & Adoption Transaction (A01 - A05, S02)', () => {
 
     // サブ図を作成してプロジェクトに追加
     const subDiagramId = 'sub-diagram-1';
+    const { project: withParent, newNode: parent } = addNodeToDiagram(project, project.rootDiagramId, {
+      label: '親', levelId: 'level-requirement', x: 0, y: 0,
+    });
     const projectWithSub = {
-      ...project,
+      ...withParent,
       diagrams: [
-        ...project.diagrams,
+        { ...withParent.diagrams[0], nodes: withParent.diagrams[0].nodes.map((node) => node.id === parent.id ? { ...node, childDiagramId: subDiagramId } : node) },
         {
           id: subDiagramId,
           title: 'サブ図1',

@@ -20,12 +20,11 @@ describe('Domain Models & Validation Rules', () => {
     expect(project.rootDiagramId).toBe(project.diagrams[0].id);
   });
 
-  it('P01: 旧フォーマット thought-expansion-project も後方互換で正常に検証を通る', () => {
+  it('P01: 旧フォーマット thought-expansion-project は互換処理なしで拒否する', () => {
     const project = createNewProject('旧フォーマット検証');
     (project as any).format = 'thought-expansion-project';
     const result = validateProject(project);
-    expect(result.valid).toBe(true);
-    expect(result.errors).toHaveLength(0);
+    expect(result.valid).toBe(false);
   });
 
   it('E06: 自己エッジを拒否する', () => {
@@ -129,21 +128,23 @@ describe('Domain Models & Validation Rules', () => {
     expect(history.present.diagrams[0].nodes).toHaveLength(1);
   });
 
-  it('FUNC-01: プロジェクトタイトルおよび説明文(description)の更新と10,000文字検証', () => {
+  it('FUNC-01: 説明文はUnicodeコードポイントで2,000文字を受理し2,001文字を拒否する', () => {
     const project = createNewProject('初期プロジェクト');
     expect(project.description).toBe('');
 
     // updateProjectMeta でタイトルと説明文を更新
-    const longDescription = 'A'.repeat(5000);
+    const longDescription = 'あ'.repeat(1999) + '😀';
     const updated = updateProjectMeta(project, {
       title: '更新後プロジェクト',
       description: longDescription,
     });
 
     expect(updated.title).toBe('更新後プロジェクト');
-    expect(updated.description).toHaveLength(5000);
+    expect(Array.from(updated.description)).toHaveLength(2000);
 
     const vResult = validateProject(updated);
     expect(vResult.valid).toBe(true);
+    const tooLong = updateProjectMeta(updated, { description: `${longDescription}x` });
+    expect(validateProject(tooLong).valid).toBe(false);
   });
 });

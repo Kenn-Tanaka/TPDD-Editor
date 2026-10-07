@@ -55,7 +55,7 @@ flowchart TB
 | ボタン | 機能説明 |
 |---|---|
 | **新規作成** | 現在の編集内容を破棄し、空の初期プロジェクト（要求・機能・機構・構造の4列）を作成します。 |
-| **ファイル読込** | ローカルの `.tpdd.json`（または互換用 `.thought.json`）ファイルを選択してプロジェクトを読み込みます。Zodによる厳格な検証が行われます。 |
+| **ファイル読込** | ローカルの `.tpdd.json`（または `.thought.json`）を選択します。拡張子によらず現行スキーマだけをZodで厳格に検証し、旧スキーマは拒否します。 |
 | **JSON保存** | 現在のプロジェクト全体をインデント整形された `.tpdd.json` としてダウンロード保存します。 |
 | **SVG出力** | 現在アクティブな図を、Word/PowerPoint貼り付け互換のスタンドアロンSVGファイルとしてエクスポートします。 |
 | **ノード追加** | 現在の図の中央付近に、新しいノード（既定: 下書き状態、幅180×高72）を追加します。 |
@@ -269,11 +269,11 @@ flowchart LR
 ### 6.1 Project オブジェクト (正本)
 ```typescript
 export interface Project {
-  format: 'thought-expansion-project';
+  format: 'tpdd-project';
   schemaVersion: 1;
   id: string;                    // UUID
   title: string;                 // プロジェクト名 (最大200文字)
-  description: string;           // 説明文 (最大10,000文字)
+  description: string;           // 説明文 (最大2,000 Unicodeコードポイント)
   createdAt: string;             // ISO 8601 UTC
   updatedAt: string;             // ISO 8601 UTC
   rootDiagramId: string;         // ルート図のID
@@ -304,7 +304,7 @@ export interface ThoughtNode {
   height: number;                // 寸法高さ (48〜2000)
   childDiagramId?: string;       // サブ図が存在する場合の図ID
   meta: {
-    description: string;         // 詳細説明 (最大10,000文字)
+    description: string;         // 詳細説明 (最大2,000 Unicodeコードポイント)
     tags: string[];              // タグ一覧 (最大20個)
     sourceLinks: string[];       // 参考URL一覧 (最大20個)
   };
@@ -335,7 +335,7 @@ export interface ThoughtEdge {
 ## 第7章 ファイル入出力・自動保存・SVGエクスポート
 
 ### 7.1 プロジェクトJSON保存・読込 (`.tpdd.json`)
-- **保存形式**: UTF-8 エンコーディング、インデント2の整形JSON（旧形式 `.thought.json` とも完全互換）。
+- **保存形式**: UTF-8 エンコーディング、インデント2の整形JSON。旧スキーマとの互換・移行処理はありません。
 - **ファイル名生成**: `<プロジェクト名>_YYYYMMDD_HHMMSS.tpdd.json`（Windows禁止文字 `\ / : * ? " < > |` は自動サニタイズ）。
 - **厳格な読込検証**:  
   ファイルの読込時、Zodスキーマ検証および業務整合性検証（ID一意性、自己エッジ禁止、同種重複エッジ禁止、未定義列参照禁止、循環階層禁止）を即座に実行。不正データはエラー箇所を表示して読み込みを拒否し、編集中のプロジェクトを安全に保護します。

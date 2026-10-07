@@ -4,7 +4,10 @@
   "version": "1.1.0",
   "type": "module",
   "scripts": {
+    "prepare:config": "node scripts/prepare-runtime-config.mjs",
+    "predev": "npm run prepare:config",
     "dev": "vite",
+    "prebuild": "npm run prepare:config",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

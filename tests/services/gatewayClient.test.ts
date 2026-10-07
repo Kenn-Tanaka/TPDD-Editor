@@ -159,4 +159,13 @@ describe('Model ID & Settings Validation (M02, S01)', () => {
     // loaded に token というプロパティが存在しないこと
     expect((loaded as unknown as Record<string, unknown>).token).toBeUndefined();
   });
+
+  it('保存済みGateway URLがloopbackでなければ読込時に拒否する', () => {
+    globalThis.localStorage.setItem('tpdd_editor_settings', JSON.stringify({
+      gatewayUrl: 'https://api.example.com/v1',
+      gatewayAuthEnabled: false,
+      favoriteModelIds: ['test/model'],
+    }));
+    expect(() => loadAppSettings()).toThrow('gatewayUrl');
+  });
 });

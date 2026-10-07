@@ -1,17 +1,27 @@
 import { z } from 'zod';
 import { EdgeKindSchema, NodeKindSchema } from '../../domain/schema';
+import { countCharacters, getRuntimeConfig } from '../../config/runtimeConfig';
+
+const aiText = (limit: () => number, label: string) => z.string().superRefine((value, ctx) => {
+  const maximum = limit();
+  if (countCharacters(value) > maximum) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${label}は${maximum}文字以内です` });
+});
+const aiArray = <T extends z.ZodTypeAny>(item: T, limit: () => number, label: string) => z.array(item).superRefine((value, ctx) => {
+  const maximum = limit();
+  if (value.length > maximum) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${label}は最大${maximum}件です` });
+});
 
 // 候補ノード
 export const NodeProposalSchema = z.object({
   candidateId: z.string().min(1, 'candidateIdは必須です'),
-  label: z.string().min(1, 'ラベルは必須です').max(200, 'ラベルは200文字以内です'),
+  label: aiText(() => getRuntimeConfig().nameMaxChars, 'ラベル').refine((v) => v.length > 0, 'ラベルは必須です'),
   kind: NodeKindSchema,
   levelId: z.string().min(1, 'levelIdは必須です'),
-  description: z.string().max(10000, '説明は10,000文字以内です').default(''),
-  tags: z.array(z.string().max(100)).max(20).default([]),
-  rationale: z.string().max(2000, '採用理由は2000文字以内です').default(''),
-  assumptions: z.array(z.string().max(2000)).max(20).default([]),
-  checks: z.array(z.string().max(2000)).max(20).default([]),
+  description: aiText(() => getRuntimeConfig().descriptionMaxChars, '説明').default(''),
+  tags: aiArray(aiText(() => getRuntimeConfig().tagMaxChars, 'タグ'), () => getRuntimeConfig().tagMaxCount, 'タグ').default([]),
+  rationale: aiText(() => getRuntimeConfig().descriptionMaxChars, '採用理由').default(''),
+  assumptions: aiArray(aiText(() => getRuntimeConfig().descriptionMaxChars, '前提'), () => getRuntimeConfig().tagMaxCount, '前提').default([]),
+  checks: aiArray(aiText(() => getRuntimeConfig().descriptionMaxChars, '確認事項'), () => getRuntimeConfig().tagMaxCount, '確認事項').default([]),
 });
 export type NodeProposal = z.infer<typeof NodeProposalSchema>;
 
@@ -20,7 +30,7 @@ export const EdgeProposalSchema = z.object({
   sourceRef: z.string().min(1), // existing:<nodeId> または candidate:<candidateId>
   targetRef: z.string().min(1),
   kind: EdgeKindSchema,
-  label: z.string().max(200).default(''),
+  label: aiText(() => getRuntimeConfig().nameMaxChars, 'エッジラベル').default(''),
 });
 export type EdgeProposal = z.infer<typeof EdgeProposalSchema>;
 
@@ -29,9 +39,9 @@ export const ProposalResponseSchema = z.object({
   format: z.literal('tpdd-ai-proposal'),
   schemaVersion: z.literal(1),
   task: z.enum(['expand', 'alternatives']),
-  summary: z.string().max(2000, '要約は2000文字以内です'),
-  nodes: z.array(NodeProposalSchema).min(1, 'ノード提案は最低1件必要です').max(10, 'ノード提案は最大10件までです'),
-  edges: z.array(EdgeProposalSchema).max(20, 'エッジ提案は最大20件までです'),
+  summary: aiText(() => getRuntimeConfig().descriptionMaxChars, '要約'),
+  nodes: aiArray(NodeProposalSchema, () => getRuntimeConfig().aiProposalMaxNodes, 'ノード提案').refine((v) => v.length > 0, 'ノード提案は最低1件必要です'),
+  edges: aiArray(EdgeProposalSchema, () => getRuntimeConfig().aiProposalMaxEdges, 'エッジ提案'),
 });
 export type ProposalResponse = z.infer<typeof ProposalResponseSchema>;
 
@@ -41,8 +51,8 @@ export const ReviewIssueSchema = z.object({
   nodeIds: z.array(z.string()).default([]),
   edgeIds: z.array(z.string()).default([]),
   category: z.enum(['missing', 'conflict', 'ambiguity', 'verification']),
-  message: z.string().max(2000, '指摘メッセージは2000文字以内です'),
-  recommendation: z.string().max(2000, '改善提案は2000文字以内です'),
+  message: aiText(() => getRuntimeConfig().descriptionMaxChars, '指摘メッセージ'),
+  recommendation: aiText(() => getRuntimeConfig().descriptionMaxChars, '改善提案'),
 });
 export type ReviewIssue = z.infer<typeof ReviewIssueSchema>;
 
@@ -51,8 +61,8 @@ export const ReviewResponseSchema = z.object({
   format: z.literal('tpdd-ai-review'),
   schemaVersion: z.literal(1),
   task: z.literal('review'),
-  summary: z.string().max(2000, '要約は2000文字以内です'),
-  issues: z.array(ReviewIssueSchema).max(30, '指摘事項は最大30件までです'),
+  summary: aiText(() => getRuntimeConfig().descriptionMaxChars, '要約'),
+  issues: aiArray(ReviewIssueSchema, () => getRuntimeConfig().aiReviewMaxIssues, '指摘事項'),
 });
 export type ReviewResponse = z.infer<typeof ReviewResponseSchema>;
 
@@ -60,9 +70,9 @@ export const LevelDefinitionProposalSchema = z.object({
   format: z.literal('tpdd-ai-level-definition'),
   schemaVersion: z.literal(1),
   task: z.literal('define-level'),
-  description: z.string().min(1, '説明文は必須です').max(1000),
-  includes: z.array(z.string().min(1).max(300)).min(1).max(10),
-  excludes: z.array(z.string().min(1).max(300)).max(10),
+  description: aiText(() => getRuntimeConfig().descriptionMaxChars, '説明文').refine((v) => v.length > 0, '説明文は必須です'),
+  includes: aiArray(aiText(() => getRuntimeConfig().placementCriterionMaxChars, '配置基準').refine((v) => v.length > 0), () => getRuntimeConfig().placementCriterionMaxCount, '含める内容').refine((v) => v.length > 0, '含める内容は最低1件必要です'),
+  excludes: aiArray(aiText(() => getRuntimeConfig().placementCriterionMaxChars, '配置基準').refine((v) => v.length > 0), () => getRuntimeConfig().placementCriterionMaxCount, '含めない内容'),
   assumptions: z.array(z.string().min(1).max(500)).max(10).default([]),
 });
 export type LevelDefinitionProposal = z.infer<typeof LevelDefinitionProposalSchema>;

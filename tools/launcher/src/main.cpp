@@ -7,15 +7,30 @@
 #include <chrono>
 #include <filesystem>
 #include <iostream>
+#include <fstream>
+#include <regex>
+#include <sstream>
 #include <string>
 #include <thread>
 
 namespace fs = std::filesystem;
 
 namespace {
-constexpr unsigned short kGatewayPort = 8765;
-constexpr unsigned short kEditorPort = 3000;
-constexpr auto kStartupTimeout = std::chrono::seconds(30);
+#ifndef TPDD_DEFAULT_GATEWAY_PORT
+#error TPDD_DEFAULT_GATEWAY_PORT must be supplied from config/defaults.json by the build script
+#endif
+#ifndef TPDD_DEFAULT_EDITOR_PORT
+#error TPDD_DEFAULT_EDITOR_PORT must be supplied from config/defaults.json by the build script
+#endif
+#ifndef TPDD_DEFAULT_LAUNCHER_TIMEOUT_MS
+#error TPDD_DEFAULT_LAUNCHER_TIMEOUT_MS must be supplied from config/defaults.json by the build script
+#endif
+
+struct LauncherConfig {
+  unsigned short gatewayPort = TPDD_DEFAULT_GATEWAY_PORT;
+  unsigned short editorPort = TPDD_DEFAULT_EDITOR_PORT;
+  std::chrono::milliseconds startupTimeout{TPDD_DEFAULT_LAUNCHER_TIMEOUT_MS};
+};
 
 struct Layout {
   fs::path gatewayDirectory;
@@ -23,6 +38,7 @@ struct Layout {
   fs::path gatewayConfig;
   fs::path appDirectory;
   fs::path serverScript;
+  fs::path runtimeConfig;
 };
 
 std::wstring quote(const fs::path& value) {
@@ -46,6 +62,7 @@ Layout resolveLayout(const fs::path& launcherDirectory) {
     launcherDirectory / L"gateway" / L"config" / L"gateway.json",
     launcherDirectory / L"app",
     launcherDirectory / L"app" / L"serve.mjs",
+    launcherDirectory / L"app" / L"dist" / L"tpdd-config.json",
   };
   if (fs::exists(packaged.gatewayExe) && fs::exists(packaged.serverScript)) {
     return packaged;
@@ -59,12 +76,45 @@ Layout resolveLayout(const fs::path& launcherDirectory) {
     projectRoot / L"tools" / L"llm-gateway" / L"config" / L"gateway.json",
     projectRoot,
     projectRoot / L"scripts" / L"serve-dist.mjs",
+    projectRoot / L"dist" / L"tpdd-config.json",
   };
   if (!fs::exists(development.gatewayConfig)) {
     development.gatewayConfig = projectRoot / L"tools" / L"llm-gateway" /
                                 L"config" / L"gateway.example.json";
   }
   return development;
+}
+
+long long readIntegerSetting(const std::string& json, const char* key) {
+  const std::regex pattern(std::string("\\\"") + key + "\\\"\\s*:\\s*([0-9]+)");
+  std::smatch match;
+  if (!std::regex_search(json, match, pattern)) {
+    throw std::runtime_error(std::string("tpdd-config.jsonの項目が見つからないか整数ではありません: ") + key);
+  }
+  return std::stoll(match[1].str());
+}
+
+LauncherConfig loadLauncherConfig(const fs::path& path) {
+  LauncherConfig result;
+  if (!fs::exists(path)) return result;  // 配布設定がなければ同じdefaults.json由来のビルド値を使う。
+  std::ifstream input(path, std::ios::binary);
+  if (!input) throw std::runtime_error("tpdd-config.jsonを開けませんでした。");
+  std::ostringstream buffer;
+  buffer << input.rdbuf();
+  const std::string json = buffer.str();
+  const auto gatewayPort = readIntegerSetting(json, "gatewayPort");
+  const auto editorPort = readIntegerSetting(json, "editorPort");
+  const auto timeoutMs = readIntegerSetting(json, "launcherStartupTimeoutMs");
+  if (gatewayPort < 1 || gatewayPort > 65535 || editorPort < 1 || editorPort > 65535) {
+    throw std::runtime_error("tpdd-config.jsonのポート番号は1〜65535である必要があります。");
+  }
+  if (timeoutMs < 1000 || timeoutMs > 3600000) {
+    throw std::runtime_error("launcherStartupTimeoutMsは1000〜3600000の範囲である必要があります。");
+  }
+  result.gatewayPort = static_cast<unsigned short>(gatewayPort);
+  result.editorPort = static_cast<unsigned short>(editorPort);
+  result.startupTimeout = std::chrono::milliseconds(timeoutMs);
+  return result;
 }
 
 bool isPortOpen(unsigned short port) {
@@ -118,8 +168,8 @@ PROCESS_INFORMATION startProcess(
   return processInfo;
 }
 
-bool waitForPort(unsigned short port, HANDLE childProcess) {
-  const auto deadline = std::chrono::steady_clock::now() + kStartupTimeout;
+bool waitForPort(unsigned short port, HANDLE childProcess, std::chrono::milliseconds timeout) {
+  const auto deadline = std::chrono::steady_clock::now() + timeout;
   while (std::chrono::steady_clock::now() < deadline) {
     if (isPortOpen(port)) return true;
     if (processExited(childProcess)) return false;
@@ -155,10 +205,11 @@ int wmain() {
 
   try {
     const Layout layout = resolveLayout(executableDirectory());
+    const LauncherConfig config = loadLauncherConfig(layout.runtimeConfig);
 
     std::wcout << L"Thinking Process Development Diagram Editor (TPDD Editor)\n\n";
 
-    if (!isPortOpen(kGatewayPort)) {
+    if (!isPortOpen(config.gatewayPort)) {
       if (!fs::exists(layout.gatewayExe)) {
         throw std::runtime_error(
           "LLM Gateway executable was not found. Run npm run build:release first."
@@ -173,14 +224,14 @@ int wmain() {
         quote(layout.gatewayExe) + L" " + quote(layout.gatewayConfig),
         layout.gatewayDirectory
       );
-      if (!waitForPort(kGatewayPort, gatewayProcess.hProcess)) {
-        throw std::runtime_error("LLM Gatewayが30秒以内に起動しませんでした。");
+      if (!waitForPort(config.gatewayPort, gatewayProcess.hProcess, config.startupTimeout)) {
+        throw std::runtime_error("LLM Gatewayが設定された起動待ち時間内に起動しませんでした。");
       }
     } else {
       std::wcout << L"[1/3] LLM Gatewayは既に起動しています。\n";
     }
 
-    if (!isPortOpen(kEditorPort)) {
+    if (!isPortOpen(config.editorPort)) {
       if (!fs::exists(layout.serverScript)) {
         throw std::runtime_error("TPDD distribution server script was not found.");
       }
@@ -195,8 +246,8 @@ int wmain() {
         quote(nodePath) + L" " + quote(layout.serverScript),
         layout.appDirectory
       );
-      if (!waitForPort(kEditorPort, editorProcess.hProcess)) {
-        throw std::runtime_error("TPDD配布サーバーが30秒以内に起動しませんでした。");
+      if (!waitForPort(config.editorPort, editorProcess.hProcess, config.startupTimeout)) {
+        throw std::runtime_error("TPDD配布サーバーが設定された起動待ち時間内に起動しませんでした。");
       }
     } else {
       std::wcout << L"[2/3] TPDD配布サーバーは既に起動しています。\n";
@@ -206,7 +257,7 @@ int wmain() {
     const auto browserResult = reinterpret_cast<INT_PTR>(ShellExecuteW(
       nullptr,
       L"open",
-      L"http://127.0.0.1:3000",
+      (L"http://127.0.0.1:" + std::to_wstring(config.editorPort)).c_str(),
       nullptr,
       nullptr,
       SW_SHOWNORMAL
@@ -216,8 +267,8 @@ int wmain() {
     }
 
     std::wcout << L"\n起動が完了しました。\n"
-               << L"Editor : http://127.0.0.1:3000\n"
-               << L"Gateway: http://127.0.0.1:8765/v1\n";
+               << L"Editor : http://127.0.0.1:" << config.editorPort << L"\n"
+               << L"Gateway: http://127.0.0.1:" << config.gatewayPort << L"/v1\n";
 
     closeProcessHandle(gatewayProcess);
     closeProcessHandle(editorProcess);

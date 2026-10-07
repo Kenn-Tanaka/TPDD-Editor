@@ -5,6 +5,7 @@ node_modules/
 dist/
 **/dist/
 release/
+public/tpdd-config.json
 
 # C/C++ ビルド成果物・中間ファイル
 build/

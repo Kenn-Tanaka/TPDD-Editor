@@ -4,6 +4,7 @@ import { useApp } from '../../app/AppContext';
 import { findDescendantDiagramIds } from '../../domain/commands';
 import { EdgeKind, NodeKind, NodeStatus } from '../../domain/schema';
 import { NODE_KIND_LABELS } from '../../rendering/svgExport';
+import { countCharacters, getRuntimeConfig } from '../../config/runtimeConfig';
 
 export const DetailPanel: React.FC = () => {
   const { state, dispatch } = useApp();
@@ -20,6 +21,11 @@ export const DetailPanel: React.FC = () => {
   const [newTagInput, setNewTagInput] = useState('');
   const [newLinkInput, setNewLinkInput] = useState('');
   const [edgeLabelInput, setEdgeLabelInput] = useState('');
+  const config = getRuntimeConfig();
+  const showInputError = (message: string) => dispatch({
+    type: 'SET_NOTIFICATION',
+    notification: { id: `input-limit-${Date.now()}`, type: 'error', message },
+  });
 
   useEffect(() => {
     if (selectedNode) {
@@ -97,6 +103,10 @@ export const DetailPanel: React.FC = () => {
             onChange={(e) => setEdgeLabelInput(e.target.value)}
             onBlur={() => {
               if (edgeLabelInput !== selectedEdge.label) {
+                if (countCharacters(edgeLabelInput) > config.nameMaxChars) {
+                  showInputError(`エッジラベルは${config.nameMaxChars}文字以内です。`);
+                  return;
+                }
                 dispatch({
                   type: 'UPDATE_EDGE',
                   edgeId: selectedEdge.id,
@@ -126,6 +136,10 @@ export const DetailPanel: React.FC = () => {
       setLabelInput(selectedNode.label);
       return;
     }
+    if (countCharacters(trimmed) > config.nameMaxChars) {
+      showInputError(`ノード名は${config.nameMaxChars}文字以内です。`);
+      return;
+    }
     if (trimmed !== selectedNode.label) {
       dispatch({
         type: 'UPDATE_NODE',
@@ -136,6 +150,10 @@ export const DetailPanel: React.FC = () => {
   };
 
   const handleDescCommit = () => {
+    if (countCharacters(descInput) > config.descriptionMaxChars) {
+      showInputError(`説明は${config.descriptionMaxChars}文字以内です。`);
+      return;
+    }
     if (descInput !== selectedNode.meta.description) {
       dispatch({
         type: 'UPDATE_NODE',
@@ -148,6 +166,14 @@ export const DetailPanel: React.FC = () => {
   const handleAddTag = () => {
     const tag = newTagInput.trim();
     if (!tag || selectedNode.meta.tags.includes(tag)) return;
+    if (countCharacters(tag) > config.tagMaxChars) {
+      showInputError(`タグは${config.tagMaxChars}文字以内です。`);
+      return;
+    }
+    if (selectedNode.meta.tags.length >= config.tagMaxCount) {
+      showInputError(`タグは最大${config.tagMaxCount}件です。`);
+      return;
+    }
     dispatch({
       type: 'UPDATE_NODE',
       nodeId: selectedNode.id,
@@ -180,6 +206,14 @@ export const DetailPanel: React.FC = () => {
           message: '参考リンクは http:// または https:// で始まる有効なURLを入力してください。',
         },
       });
+      return;
+    }
+    if (countCharacters(url) > config.sourceLinkMaxChars) {
+      showInputError(`参考リンクは${config.sourceLinkMaxChars}文字以内です。`);
+      return;
+    }
+    if (selectedNode.meta.sourceLinks.length >= config.sourceLinkMaxCount) {
+      showInputError(`参考リンクは最大${config.sourceLinkMaxCount}件です。`);
       return;
     }
     dispatch({

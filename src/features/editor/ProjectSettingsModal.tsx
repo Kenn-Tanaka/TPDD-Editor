@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FolderKanban, X, Save, Clock, Hash, Network, Layers } from 'lucide-react';
 import { useApp } from '../../app/AppContext';
+import { countCharacters, getRuntimeConfig } from '../../config/runtimeConfig';
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
   const totalEdges = project.diagrams.reduce((sum, d) => sum + d.edges.length, 0);
 
   const handleSave = () => {
+    const config = getRuntimeConfig();
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       dispatch({
@@ -51,12 +53,20 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
       });
       return;
     }
+    if (countCharacters(trimmedTitle) > config.nameMaxChars) {
+      dispatch({ type: 'SET_NOTIFICATION', notification: { id: `title-limit-${Date.now()}`, type: 'error', message: `プロジェクト名は${config.nameMaxChars}文字以内です。` } });
+      return;
+    }
+    if (countCharacters(description) > config.descriptionMaxChars) {
+      dispatch({ type: 'SET_NOTIFICATION', notification: { id: `description-err-${Date.now()}`, type: 'error', message: `説明は${config.descriptionMaxChars}文字以内です。` } });
+      return;
+    }
 
     dispatch({
       type: 'UPDATE_PROJECT_META',
       patch: {
         title: trimmedTitle,
-        description: description.slice(0, 10000),
+        description,
       },
     });
 
@@ -104,7 +114,6 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              maxLength={200}
               placeholder="例: スマートオフィス環境制御システム"
               className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium text-slate-800"
             />
@@ -116,14 +125,13 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
               <label className="text-xs font-bold text-slate-700 block">
                 プロジェクト詳細説明
               </label>
-              <span className={`text-[10px] ${description.length > 9500 ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
-                {description.length.toLocaleString()} / 10,000文字
+              <span className={`text-[10px] ${countCharacters(description) > getRuntimeConfig().descriptionMaxChars ? 'text-red-600 font-bold' : 'text-slate-400'}`}>
+                {countCharacters(description).toLocaleString()} / {getRuntimeConfig().descriptionMaxChars.toLocaleString()}文字
               </span>
             </div>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              maxLength={10000}
               rows={6}
               placeholder="要求の背景、システムの目的、全体スコープ、前提条件、関係者メモなどを入力してください。"
               className="w-full p-3 text-xs border border-slate-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 leading-relaxed text-slate-800"

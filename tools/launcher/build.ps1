@@ -4,10 +4,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $OutputPath) {
-    $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $OutputPath = Join-Path $projectRoot "release\TPDD-Launcher.exe"
 }
+$defaults = Get-Content -Raw (Join-Path $projectRoot "config\defaults.json") | ConvertFrom-Json
 $sourcePath = Join-Path $PSScriptRoot "src\main.cpp"
 $outputDirectory = Split-Path -Parent $OutputPath
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
@@ -23,6 +24,9 @@ if (-not $compiler) {
     -DNDEBUG `
     -Wall `
     -Wextra `
+    "-DTPDD_DEFAULT_GATEWAY_PORT=$($defaults.gatewayPort)" `
+    "-DTPDD_DEFAULT_EDITOR_PORT=$($defaults.editorPort)" `
+    "-DTPDD_DEFAULT_LAUNCHER_TIMEOUT_MS=$($defaults.launcherStartupTimeoutMs)" `
     -municode `
     -static `
     -static-libgcc `

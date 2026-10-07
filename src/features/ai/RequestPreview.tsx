@@ -1,6 +1,7 @@
 import React from 'react';
 import { Eye, ShieldAlert, Cpu, Globe } from 'lucide-react';
 import { extractScopeElements, PromptPayload } from '../../services/llm/prompts';
+import { getRuntimeConfig } from '../../config/runtimeConfig';
 
 interface RequestPreviewProps {
   payload: PromptPayload;
@@ -41,7 +42,10 @@ export const RequestPreview: React.FC<RequestPreviewProps> = ({ payload, modelId
     scopedEdges.reduce((acc, e) => acc + (e.label?.length || 0), 0) +
     payload.levels.reduce((acc, l) => acc + l.label.length, 0);
 
-  const isExceeded = scopedNodes.length > 200 || scopedEdges.length > 400 || roughText > 1000000;
+  const config = getRuntimeConfig();
+  const isExceeded = scopedNodes.length > config.aiPreviewMaxNodes
+    || scopedEdges.length > config.aiPreviewMaxEdges
+    || roughText > config.aiPreviewMaxChars;
 
   return (
     <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 text-xs">
