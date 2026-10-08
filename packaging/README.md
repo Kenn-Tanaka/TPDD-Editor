@@ -27,7 +27,11 @@ cd packaging
 .\build-release.ps1
 ```
 
-※ バージョン番号を指定する場合:
+出力名はプロジェクト直下の `package.json` の `version` から自動決定します。`1.1.0` なら `release/TPDD_v1.1.0/` と `release/TPDD_v1.1.0.zip` を生成します。ビルドキットZIPも同じ値を使用します。カレントディレクトリには依存しません。
+
+バージョン変更時は先に `package.json` と `package-lock.json` を更新してください。任意の `-Version` は一致確認用で、内部バージョンと異なる値はビルド開始前に拒否します。
+
+一致確認を明示する場合:
 ```powershell
 .\build-release.ps1 -Version "1.1.0"
 ```

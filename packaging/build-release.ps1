@@ -8,11 +8,12 @@
 
 [CmdletBinding()]
 param(
-    [string]$Version = "1.1.0",
+    [string]$Version,
     [switch]$ForceTempMingw
 )
 
 $ErrorActionPreference = "Stop"
+$Version = & (Join-Path $PSScriptRoot 'get-project-version.ps1') -ExpectedVersion $Version
 
 Write-Host "====================================================" -ForegroundColor Cyan
 Write-Host "  Thinking Process Development Diagram Editor (TPDD Editor) Build Kit" -ForegroundColor Cyan

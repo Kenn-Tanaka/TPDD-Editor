@@ -4,10 +4,11 @@
 #>
 
 param(
-    [string]$Version = "1.1.0"
+    [string]$Version
 )
 
 $ErrorActionPreference = "Stop"
+$Version = & (Join-Path $PSScriptRoot 'get-project-version.ps1') -ExpectedVersion $Version
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
